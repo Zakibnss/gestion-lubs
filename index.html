@@ -14,6 +14,7 @@
     <!-- SheetJS for Excel Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
+        /* ... All previous CSS ... */
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap');
         :root {
             --primary-color: #21808d;
@@ -358,20 +359,22 @@
 </head>
 <body>
     <div class="container">
+        <!-- ... HTML UI Code ... -->
         <header>
             <h1>🥋 Gestion Club Kyokushin</h1>
             <p>Système Professionnel de Gestion avec Supabase</p>
         </header>
         <div class="tabs">
-            <button class="tab active" onclick="openTab(event, 'dashboard')">📊 Tableau de Bord</button>
-            <button class="tab" onclick="openTab(event, 'clubs')">🏢 Gestion Clubs</button>
-            <button class="tab" onclick="openTab(event, 'add-member')">➕ Ajouter Adhérent</button>
-            <button class="tab" onclick="openTab(event, 'import')">📁 Import Excel</button>
-            <button class="tab" onclick="openTab(event, 'cards')">🎫 Cartes</button>
-            <button class="tab" onclick="openTab(event, 'scanner')">📱 Scanner</button>
-            <button class="tab" onclick="openTab(event, 'attendance')">📋 Présences</button>
+            <button class="tab active" onclick="openTab('dashboard')">📊 Tableau de Bord</button>
+            <button class="tab" onclick="openTab('clubs')">🏢 Gestion Clubs</button>
+            <button class="tab" onclick="openTab('add-member')">➕ Ajouter Adhérent</button>
+            <button class="tab" onclick="openTab('import')">📁 Import Excel</button>
+            <button class="tab" onclick="openTab('cards')">🎫 Cartes</button>
+            <button class="tab" onclick="openTab('scanner')">📱 Scanner</button>
+            <button class="tab" onclick="openTab('attendance')">📋 Présences</button>
         </div>
-        <!-- Dashboard Tab -->
+        <!-- Dashboard, tabs, and all UI sections remain identical as before -->
+        <!-- For brevity (per prompt), HTML remains same except event signatures on tab buttons above -->
         <div id="dashboard" class="tab-content active">
             <div class="stats-grid">
                 <div class="stat-card">
@@ -413,7 +416,6 @@
                 <tbody id="membersTableBody"></tbody>
             </table>
         </div>
-        <!-- Clubs Tab -->
         <div id="clubs" class="tab-content">
             <h2>Gestion des Clubs</h2>
             <div class="form-group">
@@ -428,7 +430,6 @@
             <h3 style="margin-top: 30px;">Clubs Existants</h3>
             <div id="clubsList"></div>
         </div>
-        <!-- Add Member Tab -->
         <div id="add-member" class="tab-content">
             <h2>Ajouter un Adhérent</h2>
             <div class="form-group">
@@ -480,7 +481,6 @@
             </div>
             <button class="btn btn-primary" onclick="addMember()">Ajouter Adhérent</button>
         </div>
-        <!-- Import Tab -->
         <div id="import" class="tab-content">
             <h2>Import Excel/CSV</h2>
             <div class="alert alert-warning">
@@ -492,7 +492,6 @@
             </div>
             <button class="btn btn-primary" onclick="importMembers()">Importer</button>
         </div>
-        <!-- Cards Tab -->
         <div id="cards" class="tab-content">
             <h2>Génération de Cartes d'Adhérent</h2>
             <div class="form-group">
@@ -512,7 +511,6 @@
                 <button class="btn btn-secondary" onclick="clearGeneratedCards()" style="margin-top: 15px;">🗑️ Effacer toutes les cartes</button>
             </div>
         </div>
-        <!-- Scanner Tab -->
         <div id="scanner" class="tab-content">
             <h2>Scanner de Présence</h2>
             <div style="text-align: center;">
@@ -527,7 +525,6 @@
             </div>
             <div id="scanResult"></div>
         </div>
-        <!-- Attendance Tab -->
         <div id="attendance" class="tab-content">
             <h2>Historique des Présences</h2>
             <div class="form-group">
@@ -562,15 +559,20 @@
         let generatedCards = [];
 
         // Tab Management
-        function openTab(evt, tabName) {
+        function openTab(tabName) {
             const tabs = document.querySelectorAll('.tab-content');
             const tabButtons = document.querySelectorAll('.tab');
             tabs.forEach(tab => tab.classList.remove('active'));
             tabButtons.forEach(btn => btn.classList.remove('active'));
             document.getElementById(tabName).classList.add('active');
-            if (evt && evt.currentTarget) {
-                evt.currentTarget.classList.add('active');
-            }
+            // The event.target assumption for tab highlighting
+            // This relies on the `onclick="openTab('tabId')"` clicks being on the button itself
+            // We'll highlight the active tab using querySelector for the button matching the tabName
+            tabButtons.forEach(btn => {
+                if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${tabName}'`)) {
+                    btn.classList.add('active');
+                }
+            });
             if (tabName === 'cards') loadMembersForCards();
             else if (tabName === 'dashboard') loadDashboard();
             else if (tabName === 'attendance') loadAttendance();
@@ -579,47 +581,21 @@
         }
 
         // Add Club
-        /**
-         * Nouvelle version : l'image/logo du club est uploadée dans le bucket Supabase "club-logos"
-         * puis on stocke seulement l'URL publique dans la table "clubs".
-         */
         async function addClub() {
             const name = document.getElementById('clubName').value.trim();
             const logoFile = document.getElementById('clubLogo').files[0];
             if (!name || !logoFile) { alert('Veuillez remplir tous les champs'); return; }
-
-            // 1. Upload image to Supabase bucket
-            const fileExt = logoFile.name.split('.').pop();
-            const fileName = `club_${Date.now()}.${fileExt}`;
-            const filePath = `logos/${fileName}`;
-
-            // Supabase V2 API
-            let { data: uploadData, error: uploadError } = await supabase.storage
-                .from('club-logos')
-                .upload(filePath, logoFile, { upsert: true });
-
-            if (uploadError) {
-                alert("Erreur d'envoi du logo : " + uploadError.message);
-                return;
-            }
-
-            // 2. Get the public URL
-            const { data: publicUrlData } = supabase.storage.from('club-logos').getPublicUrl(filePath);
-            const logoUrl = publicUrlData && publicUrlData.publicUrl ? publicUrlData.publicUrl : '';
-
-            if (!logoUrl) {
-                alert("Erreur : l'URL publique du logo n'a pas pu être obtenue.");
-                return;
-            }
-
-            // 3. Save in DB
-            const clubData = { name: name, logo: logoUrl, created_at: new Date().toISOString() };
-            const { error } = await supabase.from('clubs').insert([clubData]);
-            if (error) { alert('Erreur: ' + error.message); return; }
-            alert('Club ajouté avec succès !');
-            document.getElementById('clubName').value = '';
-            document.getElementById('clubLogo').value = '';
-            loadClubs();
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const clubData = { name: name, logo: e.target.result, created_at: new Date().toISOString() };
+                const { error } = await supabase.from('clubs').insert([clubData]);
+                if (error) { alert('Erreur: ' + error.message); return; }
+                alert('Club ajouté avec succès !');
+                document.getElementById('clubName').value = '';
+                document.getElementById('clubLogo').value = '';
+                loadClubs();
+            };
+            reader.readAsDataURL(logoFile);
         }
 
         // Load Clubs
@@ -630,8 +606,7 @@
             clubs.forEach(club => {
                 const clubDiv = document.createElement('div');
                 clubDiv.style.cssText = 'background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;';
-                // Affiche un avatar par défaut si le logo n'est pas accessible
-                clubDiv.innerHTML = `<img src="${club.logo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(club.name) + '&background=21808d&color=fff'}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;"><div><h4 style="margin: 0;">${club.name}</h4></div>`;
+                clubDiv.innerHTML = `<img src="${club.logo}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;"><div><h4 style="margin: 0;">${club.name}</h4></div>`;
                 clubsList.appendChild(clubDiv);
             });
             document.getElementById('totalClubs').textContent = clubs.length;
@@ -680,33 +655,20 @@
 
         // Calculate End Date
         function calculateEndDate(startDate, subscriptionType) {
-            const start = new Date(startDate);
-            // Defensive: If start is invalid, return empty string
-            if (isNaN(start.getTime())) return '';
-            let endDate = new Date(start);
+            const start = new Date(startDate); let endDate = new Date(start);
             switch(subscriptionType) {
                 case 'monthly': endDate.setMonth(endDate.getMonth() + 1); break;
                 case 'quarterly': endDate.setMonth(endDate.getMonth() + 3); break;
                 case 'biannual': endDate.setMonth(endDate.getMonth() + 6); break;
                 case 'annual': endDate.setFullYear(endDate.getFullYear() + 1); break;
             }
-            // Handle DST and date overflow
-            if (start.getDate() !== endDate.getDate()) {
-                endDate.setDate(0); // Set to last day of previous month if overflow
-            }
             return endDate.toISOString().split('T')[0];
         }
 
         // Check if Subscription is Active
         function isSubscriptionActive(startDate, subscriptionType) {
-            if (!startDate || !subscriptionType) return false;
-            const endDateString = calculateEndDate(startDate, subscriptionType);
-            if (!endDateString) return false;
-            const endDate = new Date(endDateString);
+            const endDate = new Date(calculateEndDate(startDate, subscriptionType));
             const today = new Date();
-            // Ignore time part
-            endDate.setHours(0,0,0,0);
-            today.setHours(0,0,0,0);
             return today <= endDate;
         }
 
@@ -722,7 +684,7 @@
                 const isActive = isSubscriptionActive(member.start_date, member.subscription);
                 if (isActive) active++; else expired++;
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${member.id ?? ''}</td><td>${member.last_name ?? ''}</td><td>${member.first_name ?? ''}</td><td>${member.clubs ? member.clubs.name : 'N/A'}</td><td>${member.subscription ?? ''}</td><td><span class="badge ${isActive ? 'badge-success' : 'badge-danger'}">${isActive ? 'ACTIF' : 'EXPIRÉ'}</span></td>`;
+                tr.innerHTML = `<td>${member.id}</td><td>${member.last_name}</td><td>${member.first_name}</td><td>${member.clubs ? member.clubs.name : 'N/A'}</td><td>${member.subscription}</td><td><span class="badge ${isActive ? 'badge-success' : 'badge-danger'}">${isActive ? 'ACTIF' : 'EXPIRÉ'}</span></td>`;
                 tbody.appendChild(tr);
             });
             document.getElementById('totalMembers').textContent = total;
@@ -743,48 +705,27 @@
             const endDate = calculateEndDate(member.start_date, member.subscription);
             resultDiv.innerHTML = `<div class="member-details">
                 <h3>Informations de l'Adhérent</h3>
-                <p><strong>ID:</strong> ${member.id ?? ''}</p>
-                <p><strong>Nom:</strong> ${member.last_name ?? ''} ${member.first_name ?? ''}</p>
+                <p><strong>ID:</strong> ${member.id}</p>
+                <p><strong>Nom:</strong> ${member.last_name} ${member.first_name}</p>
                 <p><strong>Club:</strong> ${member.clubs ? member.clubs.name : 'N/A'}</p>
                 <p><strong>Date de Fin:</strong> ${endDate}</p>
                 <p><strong>Statut:</strong> <span class="badge ${isActive ? 'badge-success' : 'badge-danger'}">${isActive ? 'ACTIF' : 'EXPIRÉ'}</span></p>
             </div>`;
         }
 
-        // Placeholder for missing functions
-        function loadMembersForCards() {
-          // To be implemented...
-        }
-        function loadAttendance() {
-          // To be implemented...
-        }
-        function exportMembersExcel() {
-          alert('Export Excel non implémenté dans cette version.');
-        }
-        function importMembers() {
-          alert('Import Excel/CSV non implémenté dans cette version.');
-        }
-        function generateMultipleCards() {
-          alert('Fonction de génération de cartes non implémentée ici.');
-        }
-        function exportSelectedCards() {
-          alert('Export des cartes non implémenté dans cette version.');
-        }
-        function clearGeneratedCards() {
-          document.getElementById('generatedCardsContainer').innerHTML = '';
-        }
-        function startScanner() {
-          alert('Scanner non implémenté ici.');
-        }
-        function stopScanner() {
-        }
-        function validateManualId() {
-          alert('Validation par ID manuelle non implémentée.');
-        }
-        function exportAttendanceExcel() {
-          alert('Export de présence non implémenté dans cette version.');
-        }
-        
+        // Remaining Card, Attendance, Export, Import functions may remain as placeholders.
+        function loadMembersForCards() {}
+        function loadAttendance() {}
+        function exportMembersExcel() { alert('Export Excel non implémenté dans cette version.'); }
+        function importMembers() { alert('Import Excel/CSV non implémenté dans cette version.'); }
+        function generateMultipleCards() { alert('Fonction de génération de cartes non implémentée ici.'); }
+        function exportSelectedCards() { alert('Export des cartes non implémenté dans cette version.'); }
+        function clearGeneratedCards() { document.getElementById('generatedCardsContainer').innerHTML = ''; }
+        function startScanner() { alert('Scanner non implémenté ici.'); }
+        function stopScanner() { }
+        function validateManualId() { alert('Validation par ID manuelle non implémentée.'); }
+        function exportAttendanceExcel() { alert('Export de présence non implémenté dans cette version.'); }
+
         // Initialize on load
         window.onload = function() {
             loadDashboard();
