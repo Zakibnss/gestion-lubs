@@ -989,6 +989,13 @@
             
             if (insertErr) {
                 let extraHelp = '';
+                // Custom error message for missing presences table
+                if (
+                    insertErr.message &&
+                    insertErr.message.toLowerCase().includes("could not find the table 'public.presences' in the schema cache")
+                ) {
+                    extraHelp = "<br><span style='color:#8a6d3b'>La table <b>presences</b> n'existe pas dans la base de données Supabase. Contactez votre administrateur technique ou créez la table <b>public.presences</b>.<br>Erreur technique détectée.</span>";
+                }
                 scanResultDiv.innerHTML = `<div class="alert alert-danger">Erreur lors de l'enregistrement de la présence<br>${insertErr.message}${extraHelp}</div>`;
             } else {
                 scanResultDiv.innerHTML = `<div class="alert alert-success">
@@ -1138,7 +1145,14 @@
 
             let { data: presences, error } = await query;
             if (error) {
-                document.getElementById('attendanceTableBody').innerHTML = `<tr><td colspan="6">Erreur chargement présences: ${error.message}</td></tr>`;
+                let customErrorMsg = error.message || "";
+                let extraHelp = "";
+                if (
+                    customErrorMsg.toLowerCase().includes("could not find the table 'public.presences' in the schema cache")
+                ) {
+                    extraHelp = "<br><span style='color:#8a6d3b'>La table <b>presences</b> n'existe pas dans la base de données.<br>Contactez votre administrateur technique Supabase ou créez la table <b>public.presences</b>.<br>Erreur technique détectée.</span>";
+                }
+                document.getElementById('attendanceTableBody').innerHTML = `<tr><td colspan="6">Erreur chargement présences: ${customErrorMsg}${extraHelp}</td></tr>`;
                 return;
             }
             if (!Array.isArray(presences)) presences = [];
