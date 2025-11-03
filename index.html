@@ -638,6 +638,59 @@
             <div class="form-group">
                 <label>Arrière-plan de la Carte (742x466 px)</label>
                 <input type="file" id="cardBackground" accept="image/*">
+                // Variable globale pour stocker l'arrière-plan
+let cardBackgroundDataUrl = '';
+
+// Upload Card Background avec compression
+function setupCardBackgroundUpload() {
+    const input = document.getElementById('cardBackground');
+    if (!input) return;
+    
+    input.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Vérifier la taille (max 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Fichier trop grand. Maximum 2MB.');
+            e.target.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                // Canvas pour redimensionner
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Taille exacte de la carte
+                canvas.width = 742;
+                canvas.height = 466;
+                
+                // Dessiner l'image
+                ctx.drawImage(img, 0, 0, 742, 466);
+                
+                // Convertir en base64 avec compression
+                cardBackgroundDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                
+                console.log('✅ Arrière-plan chargé');
+                alert('✅ Arrière-plan de carte chargé avec succès!');
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// Appeler au chargement de la page
+window.onload = function() {
+    setupCardBackgroundUpload();
+    loadDashboard();
+    loadClubs();
+};
+
             </div>
             
             <div class="form-group">
@@ -714,7 +767,8 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // Initialize Supabase
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 
-        
+        let cardBackgroundDataUrl = '';
+let generatedCards = []
         let html5QrCode = null;
         let cardBackgroundDataUrl = '';
         let generatedCards = [];
@@ -1034,7 +1088,52 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
         }
         
         // Generate Single Card
-        async function generateSingleCard(memberId) {
+     // Variable globale pour l'arrière-plan
+let cardBackgroundDataUrl = '';
+let generatedCards = [];
+
+// Setup upload background
+function setupCardBackgroundUpload() {
+    const input = document.getElementById('cardBackground');
+    if (!input) return;
+    
+    input.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Vérifier la taille
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Fichier trop grand. Maximum 2MB.');
+            e.target.value = '';
+            return;
+        }
+        window.onload = function() {
+    setupCardBackgroundUpload();
+    loadDashboard();
+    loadClubs();
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Taille de la carte
+                canvas.width = 742;
+                canvas.height = 466;
+                
+                // Dessiner
+                ctx.drawImage(img, 0, 0, 742, 466);
+                
+                // Convertir en base64
+                cardBackgroundDataUrl = canvas.to
+async function generateSingleCard(memberId) {
+    // Vérifier que l'arrière-plan est uploadé
+    if (!cardBackgroundDataUrl) {
+        alert('⚠️ Veuillez uploader un arrière-plan de carte d\'abord');
+        return;
+    }
+    
     const { data: member, error: memberError } = await supabase
         .from('members')
         .select(`
@@ -1050,6 +1149,7 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
     
     if (memberError || !member) {
         console.error('Erreur membre:', memberError);
+        alert('Erreur: Membre non trouvé');
         return;
     }
     
@@ -1067,12 +1167,14 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
         bloodType: member.blood_type,
         endDate: endDate,
         status: isActive ? 'ACTIVE' : 'EXPIRED',
-        qrData: qrData
+        qrData: qrData,
+        backgroundUrl: cardBackgroundDataUrl // Ajouter l'arrière-plan
     };
     
     generatedCards.push(cardMetadata);
     displayGeneratedCards();
 }
+
         
         // Display Generated Cards
         function displayGeneratedCards() {
