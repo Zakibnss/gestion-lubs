@@ -638,83 +638,6 @@
             <div class="form-group">
                 <label>Arrière-plan de la Carte (742x466 px)</label>
                 <input type="file" id="cardBackground" accept="image/*">
-                // Variable globale pour stocker l'arrière-plan
-
-
-
-      
-        let generatedCards = [];
-
-        // Upload Background dans Supabase Storage
-        async function setupCardBackgroundUpload() {
-            const input = document.getElementById('cardBackground');
-            if (!input) return;
-            
-            input.addEventListener('change', async function(e) {
-
-                    input.addEventListener('change', async function(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                // Vérifier la taille (max 5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('❌ Fichier trop grand. Maximum 5MB.');
-                    e.target.value = '';
-                    return;
-                }
-                
-                // Vérifier le type
-                if (!file.type.startsWith('image/')) {
-                    alert('❌ Veuillez sélectionner une image.');
-                    e.target.value = '';
-                    return;
-                }
-                
-                try {
-                    // Nom unique pour le fichier
-                    const fileName = `background-${Date.now()}.jpg`;
-                    
-                    // Upload vers Supabase Storage
-                    const { data, error } = await supabase.storage
-                        .from('card-backgrounds')
-                        .upload(fileName, file, {
-                            cacheControl: '3600',
-                            upsert: false
-                        });
-                    
-                    if (error) {
-                        throw error;
-                    }
-                    
-                    // Obtenir l'URL publique
-                    const { data: publicUrlData } = supabase.storage
-                        .from('card-backgrounds')
-                        .getPublicUrl(fileName);
-                    
-                    cardBackgroundDataUrl = publicUrlData.publicUrl;
-                    
-                    console.log('✅ Background uploadé:', cardBackgroundDataUrl);
-                    alert('✅ Arrière-plan uploadé avec succès !');
-                    
-                } catch (error) {
-                    console.error('Erreur upload:', error);
-                    alert('❌ Erreur lors de l\'upload: ' + error.message);
-                }
-            });
-        }
-        
-        // Initialiser au chargement
-        window.addEventListener('load', function() {
-            setupCardBackgroundUpload();
-            loadDashboard();
-            loadClubs();
-        });
-
-
-
-// Appeler au chargement de la page
-
-
             </div>
             
             <div class="form-group">
@@ -790,51 +713,36 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // Initialize Supabase
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+
+        
+        let html5QrCode = null;
         let cardBackgroundDataUrl = '';
         let generatedCards = [];
-        // Fonction pour gérer les onglets
-function openTab(tabName) {
-    // Cacher tous les contenus d'onglets
-    const tabContents = document.getElementsByClassName('tab-content');
-    for (let i = 0; i < tabContents.length; i++) {
-        tabContents[i].style.display = 'none';
-    }
-    
-    // Retirer la classe active de tous les boutons
-    const tabButtons = document.getElementsByClassName('tab-btn');
-    for (let i = 0; i < tabButtons.length; i++) {
-        tabButtons[i].classList.remove('active');
-    }
-    
-    // Afficher le contenu de l'onglet sélectionné
-    document.getElementById(tabName).style.display = 'block';
-    
-    // Marquer le bouton comme actif
-    event.currentTarget.classList.add('active');
-    
-    // Charger les données selon l'onglet
-    if (tabName === 'dashboard') {
-        loadDashboard();
-    } else if (tabName === 'clubs') {
-        loadClubs();
-    } else if (tabName === 'members') {
-        loadClubsForSelect();
-    } else if (tabName === 'cards') {
-        loadMembersForCards();
-        loadClubsForSelect();
-    } else if (tabName === 'attendance') {
-        loadAttendance();
-    }
-}
-
-
-       
-        let html5QrCode = null;
-       
-     
         
         // Tab Management
-       
+        function openTab(tabName) {
+            const tabs = document.querySelectorAll('.tab-content');
+            const tabButtons = document.querySelectorAll('.tab');
+            
+            tabs.forEach(tab => tab.classList.remove('active'));
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+            
+            if (tabName === 'cards') {
+                loadMembersForCards();
+            } else if (tabName === 'dashboard') {
+                loadDashboard();
+            } else if (tabName === 'attendance') {
+                loadAttendance();
+            } else if (tabName === 'clubs') {
+                loadClubs();
+            } else if (tabName === 'add-member') {
+                loadClubsForSelect();
+            }
+        }
+        
         // Add Club
         async function addClub() {
     const name = document.getElementById('clubName').value.trim();
@@ -1126,51 +1034,7 @@ function openTab(tabName) {
         }
         
         // Generate Single Card
-     // Variable globale pour l'arrière-plan
-
-
-// Setup upload background
-function setupCardBackgroundUpload() {
-    const input = document.getElementById('cardBackground');
-    if (!input) return;
-    
-    input.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        // Vérifier la taille
-        if (file.size > 2 * 1024 * 1024) {
-            alert('Fichier trop grand. Maximum 2MB.');
-            e.target.value = '';
-            return;
-        }
-        window.onload = function() {
-    setupCardBackgroundUpload();
-    loadDashboard();
-    loadClubs();
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const img = new Image();
-            img.onload = function() {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Taille de la carte
-                canvas.width = 742;
-                canvas.height = 466;
-                
-                // Dessiner
-                ctx.drawImage(img, 0, 0, 742, 466);
-                
-                // Convertir en base64
-                cardBackgroundDataUrl = canvas.to
-async function generateSingleCard(memberId) {
-    // Vérifier que l'arrière-plan est uploadé
-    if (!cardBackgroundDataUrl) {
-        alert('⚠️ Veuillez uploader un arrière-plan de carte d\'abord');
-        return;
-    }
-    
+        async function generateSingleCard(memberId) {
     const { data: member, error: memberError } = await supabase
         .from('members')
         .select(`
@@ -1186,7 +1050,6 @@ async function generateSingleCard(memberId) {
     
     if (memberError || !member) {
         console.error('Erreur membre:', memberError);
-        alert('Erreur: Membre non trouvé');
         return;
     }
     
@@ -1204,14 +1067,12 @@ async function generateSingleCard(memberId) {
         bloodType: member.blood_type,
         endDate: endDate,
         status: isActive ? 'ACTIVE' : 'EXPIRED',
-        qrData: qrData,
-        backgroundUrl: cardBackgroundDataUrl // Ajouter l'arrière-plan
+        qrData: qrData
     };
     
     generatedCards.push(cardMetadata);
     displayGeneratedCards();
 }
-
         
         // Display Generated Cards
         function displayGeneratedCards() {
@@ -1285,54 +1146,53 @@ async function generateSingleCard(memberId) {
         }
         
         // Generate Card HTML
-       function generateCardHTML(cardData) {
-    const qrId = 'qr-' + Math.random().toString(36).substr(2, 9);
-    
-    setTimeout(() => {
-        new QRCode(document.getElementById(qrId), {
-            text: cardData.qrData,
-            width: 100,
-            height: 100
-        });
-    }, 100);
-    
-    return `
-        <div class="card-preview">
-            <img src="${cardBackgroundDataUrl}" class="card-background" alt="Background" crossorigin="anonymous">
-            <img src="${cardData.clubLogo}" class="card-logo" alt="Logo">
-            <div class="card-club-name">
-                <h2>${cardData.clubName}</h2>
-                <div class="card-subtitle">Official Member Card – Kyokushinkai Karate-Do</div>
-            </div>
-            <div class="card-info">
-                <div class="card-info-box">
-                    <div class="card-info-label">ID</div>
-                    <div class="card-info-value">${cardData.memberId}</div>
+        function generateCardHTML(cardData) {
+            const qrId = 'qr-' + Math.random().toString(36).substr(2, 9);
+            
+            setTimeout(() => {
+                new QRCode(document.getElementById(qrId), {
+                    text: cardData.qrData,
+                    width: 100,
+                    height: 100
+                });
+            }, 100);
+            
+            return `
+                <div class="card-preview">
+                    <img src="${cardBackgroundDataUrl}" class="card-background" alt="Background">
+                    <img src="${cardData.clubLogo}" class="card-logo" alt="Logo">
+                    <div class="card-club-name">
+                        <h2>${cardData.clubName}</h2>
+                        <div class="card-subtitle">Official Member Card – Kyokushinkai Karate-Do</div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-info-box">
+                            <div class="card-info-label">ID</div>
+                            <div class="card-info-value">${cardData.memberId}</div>
+                        </div>
+                        <div class="card-info-box">
+                            <div class="card-info-label">FAMILY NAME</div>
+                            <div class="card-info-value">${cardData.memberName.split(' ')[0]}</div>
+                        </div>
+                        <div class="card-info-box">
+                            <div class="card-info-label">FIRST NAME</div>
+                            <div class="card-info-value">${cardData.memberName.split(' ')[1] || ''}</div>
+                        </div>
+                        <div class="card-info-box half-width">
+                            <div class="card-info-label">DATE OF BIRTH</div>
+                            <div class="card-info-value">${cardData.dob}</div>
+                        </div>
+                        <div class="card-info-box half-width">
+                            <div class="card-info-label">BLOOD TYPE / زمرة الدم</div>
+                            <div class="card-info-value">${cardData.bloodType}</div>
+                        </div>
+                    </div>
+                    <div class="card-qr">
+                        <div id="${qrId}"></div>
+                    </div>
                 </div>
-                <div class="card-info-box">
-                    <div class="card-info-label">FAMILY NAME</div>
-                    <div class="card-info-value">${cardData.memberName.split(' ')[0]}</div>
-                </div>
-                <div class="card-info-box">
-                    <div class="card-info-label">FIRST NAME</div>
-                    <div class="card-info-value">${cardData.memberName.split(' ')[1] || ''}</div>
-                </div>
-                <div class="card-info-box half-width">
-                    <div class="card-info-label">DATE OF BIRTH</div>
-                    <div class="card-info-value">${cardData.dob}</div>
-                </div>
-                <div class="card-info-box half-width">
-                    <div class="card-info-label">BLOOD TYPE / زمرة الدم</div>
-                    <div class="card-info-value">${cardData.bloodType}</div>
-                </div>
-            </div>
-            <div class="card-qr">
-                <div id="${qrId}"></div>
-            </div>
-        </div>
-    `;
-}
-
+            `;
+        }
         
         // Clear Generated Cards
         function clearGeneratedCards() {
@@ -1587,12 +1447,11 @@ async function generateSingleCard(memberId) {
             reader.readAsArrayBuffer(file);
         }
         
-               // Initialize on load
-        window.addEventListener('load', function() {
-            setupCardBackgroundUpload();
+        // Initialize on load
+        window.onload = function() {
             loadDashboard();
             loadClubs();
-        });
+        };
     </script>
 </body>
 </html>
