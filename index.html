@@ -288,8 +288,8 @@
         border-radius: 8px;
         border: 2px solid white;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        width: 70px;
-        height: 70px;
+        width: 120px; /* AGGRANDI: 70px -> 120px */
+        height: 120px; /* AGGRANDI: 70px -> 120px */
         display: flex;
         align-items: center;
         justify-content: center;
@@ -845,8 +845,8 @@
                 // --- Fix QR code: ne pas reset le container (éviter innerHTML), forcer removal du précédent node enfant, puis append ---
                 const qrDiv = document.createElement('div');
                 qrDiv.className = "card-qr";
-                qrDiv.style.width = '70px';
-                qrDiv.style.height = '70px';
+                qrDiv.style.width = '120px';    // AGGRANDI: 70 -> 120
+                qrDiv.style.height = '120px';   // AGGRANDI: 70 -> 120
                 // On force la génération synchrone (sans setTimeout) car QRCode.js injecte un canvas/image
                 // et si innerHTML est changé, le canvas peut être écrasé.
                 // 1. Nettoie tout enfant du container (ex: overlay/redraw dans un usage répété)
@@ -868,8 +868,8 @@
                 // On fournit la DIV pure pour QRCode.js
                 let qrcode = new QRCode(qrDiv, {
                     text: JSON.stringify(formattedMember, null, 0),
-                    width: 54,
-                    height: 54,
+                    width: 96,   // AGGRANDI: 54 -> 96
+                    height: 96,  // AGGRANDI: 54 -> 96
                     colorDark : "#000000",
                     colorLight : "#ffffff",
                     correctLevel: QRCode.CorrectLevel.M
