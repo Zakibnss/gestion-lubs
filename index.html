@@ -496,7 +496,9 @@
             <h2>Génération de Cartes d'Adhérent</h2>
             <div class="form-group">
                 <label>Arrière-plan de la Carte (742x466 px)</label>
-                <input type="file" id="cardBackground" accept="image/*">
+                <!-- L'arrière-plan est désormais chargé dynamiquement depuis Supabase Storage, input masquer -->
+                <input type="file" id="cardBackground" style="display:none" disabled>
+                <span id="cardBgStatus" style="color:#21808d;font-weight:bold;"></span>
             </div>
             <div class="form-group">
                 <label>Sélectionnez les Adhérents (Ctrl+Clic pour sélection multiple)</label>
@@ -565,9 +567,6 @@
             tabs.forEach(tab => tab.classList.remove('active'));
             tabButtons.forEach(btn => btn.classList.remove('active'));
             document.getElementById(tabName).classList.add('active');
-            // The event.target assumption for tab highlighting
-            // This relies on the `onclick="openTab('tabId')"` clicks being on the button itself
-            // We'll highlight the active tab using querySelector for the button matching the tabName
             tabButtons.forEach(btn => {
                 if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(`'${tabName}'`)) {
                     btn.classList.add('active');
@@ -596,6 +595,32 @@
                 loadClubs();
             };
             reader.readAsDataURL(logoFile);
+        }
+
+        async function fetchCardBackgroundFromStorage() {
+            // Assume the carte background is at storage bucket: 'cartes' path: 'background.png'
+            // Adjust 'cartes' and 'background.png' as per your supabase setup
+            try {
+                document.getElementById('cardBgStatus').textContent = 'Chargement de l\'arrière-plan...';
+                const { data, error } = await supabase.storage.from('cartes').download('background.png');
+                if (error || !data) {
+                    document.getElementById('cardBgStatus').textContent = 'Erreur: Arrière-plan non trouvé.';
+                    cardBackgroundDataUrl = '';
+                    return false;
+                }
+                // Convert blob to data url
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                    cardBackgroundDataUrl = reader.result;
+                    document.getElementById('cardBgStatus').textContent = '✔ Arrière-plan chargé depuis Supabase Storage';
+                };
+                reader.readAsDataURL(data);
+                return true;
+            } catch (e) {
+                document.getElementById('cardBgStatus').textContent = 'Erreur chargement arrière-plan';
+                cardBackgroundDataUrl = '';
+                return false;
+            }
         }
 
         // Load Clubs
@@ -713,23 +738,202 @@
             </div>`;
         }
 
-        // Remaining Card, Attendance, Export, Import functions may remain as placeholders.
-        function loadMembersForCards() {}
+        // GENERATION CARDS SECTION - Major Rework
+
+        // 1. Load all members for card selection.
+        async function loadMembersForCards() {
+            // Load background from Supabase first time, only if not already loaded.
+            if (!cardBackgroundDataUrl) await fetchCardBackgroundFromStorage();
+            // Load members for select
+            const select = document.getElementById('cardMemberSelect');
+            select.innerHTML = '';
+            const { data: members, error } = await supabase.from('members').select('*, clubs (name)');
+            if (error) { select.innerHTML = '<option>Erreur chargement membres</option>'; return; }
+            members.forEach(member => {
+                const opt = document.createElement('option');
+                let clubName = member.clubs && member.clubs.name ? member.clubs.name : '';
+                opt.value = member.id;
+                opt.textContent = `${member.id} | ${member.last_name} ${member.first_name} (${clubName})`;
+                select.appendChild(opt);
+            });
+        }
+
+        // 2. Generate cards for selected members, using carte background from Supabase Storage
+        async function generateMultipleCards() {
+            const select = document.getElementById('cardMemberSelect');
+            const selectedIds = Array.from(select.selectedOptions).map(o => o.value);
+            if (!selectedIds.length) { alert('Veuillez sélectionner au moins un membre'); return; }
+            // Load carte background if not loaded yet (should not happen normally)
+            if (!cardBackgroundDataUrl) {
+                let ok = await fetchCardBackgroundFromStorage();
+                if (!ok) {
+                    alert("Aucun arrière-plan carte utilisable.");
+                    return;
+                }
+            }
+            // Récupérer les infos membres (et clubs)
+            const { data: members, error } = await supabase.from('members').select('*, clubs (*)').in('id', selectedIds);
+            if (error || !members || !members.length) {
+                alert("Erreur de récupération des adhérents sélectionnés");
+                return;
+            }
+            const container = document.getElementById('generatedCardsContainer');
+            container.innerHTML = '';
+            generatedCards = [];
+            for (let member of members) {
+                // Card root container
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'generated-card-item';
+                cardDiv.style.position = 'relative';
+                cardDiv.style.flexDirection = 'column';
+                // Ajoute une checkbox pour l'export PNG
+                const chk = document.createElement('input');
+                chk.type = 'checkbox';
+                chk.checked = true;
+                chk.className = 'card-export-checkbox';
+                // Card visual for preview
+                const previewDiv = document.createElement('div');
+                previewDiv.className = "card-preview";
+                previewDiv.style.background = "none";
+                previewDiv.style.margin = "10px 0";
+
+                // Background image
+                const bgImg = document.createElement('img');
+                bgImg.className = "card-background";
+                bgImg.src = cardBackgroundDataUrl;
+
+                // Club logo if any
+                let logoImg = document.createElement('img');
+                logoImg.className = "card-logo";
+                // If logo exists in club
+                if (member.clubs && member.clubs.logo) {
+                    logoImg.src = member.clubs.logo;
+                } else {
+                    // default/fallback logo
+                    logoImg.src = "https://upload.wikimedia.org/wikipedia/commons/9/97/Kyokushin-kaikan.png";
+                }
+
+                // Club name/title
+                const clubNameDiv = document.createElement('div');
+                clubNameDiv.className = "card-club-name";
+                clubNameDiv.innerHTML = `<h2>${member.clubs && member.clubs.name ? member.clubs.name : 'CLUB'}</h2>
+                    <div class="card-subtitle">Carte d'Adhérent</div>`;
+
+                // Card Info block
+                const infoDiv = document.createElement('div');
+                infoDiv.className = "card-info";
+                // Format dates
+                function fmtDate(d) { if (!d) return ''; return (""+d).split('T')[0]; }
+                const endDate = calculateEndDate(member.start_date, member.subscription);
+                const boxes = [];
+                // Main info
+                boxes.push(`<div class="card-info-box half-width">
+                    <div class="card-info-label">ID Membre</div>
+                    <div class="card-info-value">${member.id}</div>
+                </div>`);
+                boxes.push(`<div class="card-info-box half-width">
+                    <div class="card-info-label">Nom</div>
+                    <div class="card-info-value">${member.last_name}</div>
+                </div>`);
+                boxes.push(`<div class="card-info-box half-width">
+                    <div class="card-info-label">Prénom</div>
+                    <div class="card-info-value">${member.first_name}</div>
+                </div>`);
+                boxes.push(`<div class="card-info-box half-width">
+                    <div class="card-info-label">Date Naiss.</div>
+                    <div class="card-info-value">${fmtDate(member.dob)}</div>
+                </div>`);
+                boxes.push(`<div class="card-info-box half-width">
+                    <div class="card-info-label">Groupe Sanguin</div>
+                    <div class="card-info-value">${member.blood_type || ""}</div>
+                </div>`);
+                boxes.push(`<div class="card-info-box half-width">
+                    <div class="card-info-label">Abonnement</div>
+                    <div class="card-info-value">${member.subscription}</div>
+                </div>`);
+                boxes.push(`<div class="card-info-box half-width">
+                    <div class="card-info-label">Début</div>
+                    <div class="card-info-value">${fmtDate(member.start_date)}</div>
+                </div>`);
+                boxes.push(`<div class="card-info-box half-width">
+                    <div class="card-info-label">Fin</div>
+                    <div class="card-info-value">${fmtDate(endDate)}</div>
+                </div>`);
+                infoDiv.innerHTML = boxes.join('');
+
+                // QR code for member ID (create element, then generate)
+                const qrDiv = document.createElement('div');
+                qrDiv.className = "card-qr";
+                qrDiv.style.width = '70px';
+                qrDiv.style.height = '70px';
+                setTimeout(() => { // must defer for proper sizing in DOM
+                    qrDiv.innerHTML = '';
+                    new QRCode(qrDiv, {
+                        text: member.id,
+                        width: 60,
+                        height: 60
+                    });
+                }, 0);
+
+                // Append to preview
+                previewDiv.appendChild(bgImg);
+                previewDiv.appendChild(logoImg);
+                previewDiv.appendChild(clubNameDiv);
+                previewDiv.appendChild(infoDiv);
+                previewDiv.appendChild(qrDiv);
+
+                // Compose generated card item
+                cardDiv.appendChild(chk);
+                cardDiv.appendChild(previewDiv);
+
+                // Add to DOM and tracking
+                container.appendChild(cardDiv);
+                generatedCards.push({
+                    member,
+                    node: previewDiv,
+                    checkbox: chk
+                });
+            }
+        }
+
+        function exportSelectedCards() {
+            if (!generatedCards.length) { alert('Aucune carte à exporter'); return; }
+            let anyExported = false;
+            generatedCards.forEach(({node, member, checkbox}, idx) => {
+                if (checkbox.checked) {
+                    anyExported = true;
+                    html2canvas(node).then(canvas => {
+                        const url = canvas.toDataURL('image/png');
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `carte_${member.id}.png`;
+                        a.click();
+                    });
+                }
+            });
+            if (!anyExported) alert("Veuillez cocher au moins une carte à exporter !");
+        }
+
+        function clearGeneratedCards() {
+            document.getElementById('generatedCardsContainer').innerHTML = '';
+            generatedCards = [];
+        }
+
+        // Dummy for attendance export/import & scanner
         function loadAttendance() {}
         function exportMembersExcel() { alert('Export Excel non implémenté dans cette version.'); }
         function importMembers() { alert('Import Excel/CSV non implémenté dans cette version.'); }
-        function generateMultipleCards() { alert('Fonction de génération de cartes non implémentée ici.'); }
-        function exportSelectedCards() { alert('Export des cartes non implémenté dans cette version.'); }
-        function clearGeneratedCards() { document.getElementById('generatedCardsContainer').innerHTML = ''; }
         function startScanner() { alert('Scanner non implémenté ici.'); }
         function stopScanner() { }
         function validateManualId() { alert('Validation par ID manuelle non implémentée.'); }
         function exportAttendanceExcel() { alert('Export de présence non implémenté dans cette version.'); }
 
-        // Initialize on load
+        // On load: dashboard, clubs, and load background carte (for cards tab)
         window.onload = function() {
             loadDashboard();
             loadClubs();
+            // Pre-fetch background when the app loads (show "Chargement..." msg in UI)
+            fetchCardBackgroundFromStorage();
         };
     </script>
 </body>
