@@ -552,7 +552,7 @@
             </div>
             <div id="qr-reader"></div>
             <div class="form-group" style="margin-top: 30px;">
-                <label>Ou Entrez l'ID Manuellement</label>
+                <label>Ou Entrez l'ID de l'athlète manuellement</label>
                 <input type="text" id="manualIdInput" placeholder="Ex: KYO001" autocomplete="off">
                 <button class="btn btn-primary" id="validateManualBtn" style="margin-top: 10px;">Valider</button>
             </div>
@@ -944,21 +944,22 @@
 
         // -------- Scanner de présence --------
 
-        async function markPresenceForMemberId(memberId) {
-            if (!memberId || !memberId.trim()) {
-                document.getElementById('scanResult').innerHTML = `<div class="alert alert-danger">Veuillez entrer un ID adhérent</div>`;
+        // Modification : la présence se valide par id athletic (id athlète)
+        async function markPresenceForMemberId(athleteId) {
+            if (!athleteId || !athleteId.trim()) {
+                document.getElementById('scanResult').innerHTML = `<div class="alert alert-danger">Veuillez entrer l'ID athlète</div>`;
                 return;
             }
-            // Récupérer les infos du membre pour éventuellement stocker son nom/club/etc
+            // Récupérer les infos du membre à partir de l'id athlète
             const { data: member, error } = await supabase
                 .from('members')
                 .select('*, clubs(name)')
-                .eq('id', memberId.trim())
+                .eq('id', athleteId.trim())
                 .single();
 
             const scanResultDiv = document.getElementById('scanResult');
             if (error || !member) {
-                scanResultDiv.innerHTML = `<div class="alert alert-danger">Aucun adhérent trouvé pour l'ID ou QR scanné: <b>${memberId}</b></div>`;
+                scanResultDiv.innerHTML = `<div class="alert alert-danger">Aucun adhérent trouvé pour l'ID athlète ou QR scanné: <b>${athleteId}</b></div>`;
                 return;
             }
 
@@ -969,11 +970,10 @@
                 date_time: now.toISOString(),
                 last_name: member.last_name,
                 first_name: member.first_name,
-                club_name: member.clubs && member.clubs.name ? member.clubs.name : "",
+                // club_name (optionnel) non utilisé par défaut
                 subscription_status: isSubscriptionActive(member.start_date, member.subscription) ? "ACTIF" : "EXPIRÉ"
             };
 
-            // Ajout dans attendance
             const { error: insertErr } = await supabase
                 .from('attendance')
                 .insert([presenceData]);
@@ -1007,11 +1007,9 @@
             const qrReaderDiv = document.getElementById('qr-reader');
             const scanResultDiv = document.getElementById('scanResult');
             scanResultDiv.innerHTML = "";
-            // Affiche/désactive overlay input file pour mobile (photo QR)
             if (isMobileDevice()) showQrFileUpload(true);
             else showQrFileUpload(false);
 
-            // Stop instance précédente
             if (html5QrCode) {
                 html5QrCode.stop().then(() => {
                     html5QrCode = null;
@@ -1022,7 +1020,6 @@
             qrReaderDiv.innerHTML = "";
             html5QrCode = new Html5Qrcode("qr-reader");
 
-            // Correction: essais caméra successifs (mobile peut échouer sur environnement)
             const tryStart = (constraintsList, onFail) => {
                 if (!constraintsList.length) {
                     if (typeof onFail === 'function') onFail();
@@ -1033,34 +1030,31 @@
                     constraint,
                     { fps: 10, qrbox: 250, aspectRatio: 1 },
                     async (qrContent, decodedResult) => {
-                        // Arrête le scanner après scan pour éviter plusieurs scans mobiles !
                         if (html5QrCode) {
                             html5QrCode.stop().then(() => { html5QrCode = null; });
                         }
-                        let memberId = isValidQrMemberId(qrContent);
-                        if (!memberId) {
+                        let athleteId = isValidQrMemberId(qrContent);
+                        if (!athleteId) {
                             scanResultDiv.innerHTML = `<div class="alert alert-danger">QR Code non reconnu<br/>(${qrContent})</div>`;
                             return;
                         }
-                        await markPresenceForMemberId(memberId);
+                        await markPresenceForMemberId(athleteId);
                     },
                     (errMsg) => {
                         // Ne rien faire sur l'erreur de decoding
                     }
                 )
                 .catch(e => {
-                    // Si échec, essaie avec d'autres contraintes (mobile: front vs back)
                     tryStart(constraintsList, onFail);
                 });
             };
 
-            // Tentative: back > front > default
             tryStart([
                 { facingMode: "environment" },
                 { facingMode: "user" },
                 null
             ], () => {
-                qrReaderDiv.innerHTML = `<div class='alert alert-danger'>Impossible d'utiliser la caméra sur cet appareil.<br>Essayez plutôt de téléverser une image/photo du QR code ci-dessous ou saisissez l'ID manuellement.</div>`;
+                qrReaderDiv.innerHTML = `<div class='alert alert-danger'>Impossible d'utiliser la caméra sur cet appareil.<br>Essayez plutôt de téléverser une image/photo du QR code ci-dessous ou saisissez l'ID (athlète) manuellement.</div>`;
             });
         }
 
@@ -1076,10 +1070,10 @@
             showQrFileUpload(false);
         }
 
-        // Correction: robustesse sur input id, enter & click, champ trim et contrôle base
+        // Correction: robustesse sur input id athlète
         function validateManualId() {
-            const memberId = document.getElementById('manualIdInput').value;
-            markPresenceForMemberId(memberId);
+            const athleteId = document.getElementById('manualIdInput').value;
+            markPresenceForMemberId(athleteId);
         }
 
         // Ajout : QR scanner par photo (upload fichier QR)
@@ -1088,25 +1082,22 @@
             const qrFile = e.target.files[0];
             if (!qrFile) return;
             scanResultDiv.innerHTML = `<div style='color:#333;font-size:14px'>Lecture en cours...</div>`;
-            // Utiliser un lecteur pour décoder QR dans une image
             const reader = new FileReader();
             reader.onload = function(evt) {
                 const img = new Image();
                 img.onload = function() {
                     try {
-                        // Utilisation de jsQR (si besoin) pour décoder depuis l'image
-                        // Mais avec html5-qrcode : on peut re-utiliser l'API statique decode
                         if (window.Html5QrcodeScanner && window.Html5Qrcode && Html5Qrcode.getCameras) {
                             Html5Qrcode.getCameras().then(function(devs){});
                         }
                         Html5Qrcode.scanFile(img, true)
                             .then(function(decodedText) {
-                                let memberId = isValidQrMemberId(decodedText);
-                                if (!memberId) {
+                                let athleteId = isValidQrMemberId(decodedText);
+                                if (!athleteId) {
                                     scanResultDiv.innerHTML = `<div class='alert alert-danger'>QR non reconnu dans l'image</div>`;
                                 } else {
                                     scanResultDiv.innerHTML = `<div style='color:#333;font-size:14px'>QR détecté dans l'image. Validation...</div>`;
-                                    markPresenceForMemberId(memberId);
+                                    markPresenceForMemberId(athleteId);
                                 }
                             }).catch(function(err) {
                                 scanResultDiv.innerHTML = `<div class='alert alert-danger'>Impossible de lire un code QR dans cette image<br>${err}</div>`;
@@ -1131,7 +1122,6 @@
         window.onload = function() {
             loadDashboard();
             loadClubs();
-            // Bonus accessibilité : si scanner/tab actif à chargement, détecte device
             if (document.getElementById('scanner').classList.contains('active')) {
                 if(isMobileDevice()) showQrFileUpload(true);
             }
