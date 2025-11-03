@@ -642,47 +642,65 @@
 let cardBackgroundDataUrl = '';
 
 // Upload Card Background avec compression
+// Variable pour stocker l'URL de l'arrière-plan
+let cardBackgroundDataUrl = '';
+
+// Upload Card Background dans Supabase Storage
 function setupCardBackgroundUpload() {
     const input = document.getElementById('cardBackground');
     if (!input) return;
     
-    input.addEventListener('change', function(e) {
+    input.addEventListener('change', async function(e) {
         const file = e.target.files[0];
         if (!file) return;
         
-        // Vérifier la taille (max 2MB)
-        if (file.size > 2 * 1024 * 1024) {
-            alert('Fichier trop grand. Maximum 2MB.');
+        // Vérifier la taille (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('❌ Fichier trop grand. Maximum 5MB.');
             e.target.value = '';
             return;
         }
         
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const img = new Image();
-            img.onload = function() {
-                // Canvas pour redimensionner
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Taille exacte de la carte
-                canvas.width = 742;
-                canvas.height = 466;
-                
-                // Dessiner l'image
-                ctx.drawImage(img, 0, 0, 742, 466);
-                
-                // Convertir en base64 avec compression
-                cardBackgroundDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                
-                console.log('✅ Arrière-plan chargé');
-                alert('✅ Arrière-plan de carte chargé avec succès!');
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
+        // Vérifier le type
+        if (!file.type.startsWith('image/')) {
+            alert('❌ Veuillez sélectionner une image.');
+            e.target.value = '';
+            return;
+        }
+        
+        try {
+            // Nom unique pour le fichier
+            const fileName = `background-${Date.now()}.jpg`;
+            
+            // Upload vers Supabase Storage
+            const { data, error } = await supabase.storage
+                .from('card-backgrounds')
+                .upload(fileName, file, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
+            
+            if (error) {
+                throw error;
+            }
+            
+            // Obtenir l'URL publique
+            const { data: publicUrlData } = supabase.storage
+                .from('card-backgrounds')
+                .getPublicUrl(fileName);
+            
+            cardBackgroundDataUrl = publicUrlData.publicUrl;
+            
+            console.log('✅ Background uploadé:', cardBackgroundDataUrl);
+            alert('✅ Arrière-plan uploadé avec succès !');
+            
+        } catch (error) {
+            console.error('Erreur upload:', error);
+            alert('❌ Erreur lors de l\'upload: ' + error.message);
+        }
     });
 }
+
 
 // Appeler au chargement de la page
 window.onload = function() {
