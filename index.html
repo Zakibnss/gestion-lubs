@@ -797,18 +797,7 @@
                     <div class="card-info-label">Groupe Sanguin</div>
                     <div class="card-info-value">${member.blood_type || ""}</div>
                 </div>`);
-                boxes.push(`<div class="card-info-box half-width">
-                    <div class="card-info-label">Abonnement</div>
-                    <div class="card-info-value">${member.subscription}</div>
-                </div>`);
-                boxes.push(`<div class="card-info-box half-width">
-                    <div class="card-info-label">Début</div>
-                    <div class="card-info-value">${fmtDate(member.start_date)}</div>
-                </div>`);
-                boxes.push(`<div class="card-info-box half-width">
-                    <div class="card-info-label">Fin</div>
-                    <div class="card-info-value">${fmtDate(endDate)}</div>
-                </div>`);
+                
                 infoDiv.innerHTML = boxes.join('');
 
                 // QR code for ID
@@ -820,8 +809,8 @@
                     qrDiv.innerHTML = '';
                     new QRCode(qrDiv, {
                         text: member.id,
-                        width: 60,
-                        height: 60
+                        width: 50,
+                        height: 50
                     });
                 }, 0);
 
