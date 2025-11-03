@@ -1266,53 +1266,54 @@ async function generateSingleCard(memberId) {
         }
         
         // Generate Card HTML
-        function generateCardHTML(cardData) {
-            const qrId = 'qr-' + Math.random().toString(36).substr(2, 9);
-            
-            setTimeout(() => {
-                new QRCode(document.getElementById(qrId), {
-                    text: cardData.qrData,
-                    width: 100,
-                    height: 100
-                });
-            }, 100);
-            
-            return `
-                <div class="card-preview">
-                    <img src="${cardBackgroundDataUrl}" class="card-background" alt="Background">
-                    <img src="${cardData.clubLogo}" class="card-logo" alt="Logo">
-                    <div class="card-club-name">
-                        <h2>${cardData.clubName}</h2>
-                        <div class="card-subtitle">Official Member Card – Kyokushinkai Karate-Do</div>
-                    </div>
-                    <div class="card-info">
-                        <div class="card-info-box">
-                            <div class="card-info-label">ID</div>
-                            <div class="card-info-value">${cardData.memberId}</div>
-                        </div>
-                        <div class="card-info-box">
-                            <div class="card-info-label">FAMILY NAME</div>
-                            <div class="card-info-value">${cardData.memberName.split(' ')[0]}</div>
-                        </div>
-                        <div class="card-info-box">
-                            <div class="card-info-label">FIRST NAME</div>
-                            <div class="card-info-value">${cardData.memberName.split(' ')[1] || ''}</div>
-                        </div>
-                        <div class="card-info-box half-width">
-                            <div class="card-info-label">DATE OF BIRTH</div>
-                            <div class="card-info-value">${cardData.dob}</div>
-                        </div>
-                        <div class="card-info-box half-width">
-                            <div class="card-info-label">BLOOD TYPE / زمرة الدم</div>
-                            <div class="card-info-value">${cardData.bloodType}</div>
-                        </div>
-                    </div>
-                    <div class="card-qr">
-                        <div id="${qrId}"></div>
-                    </div>
+       function generateCardHTML(cardData) {
+    const qrId = 'qr-' + Math.random().toString(36).substr(2, 9);
+    
+    setTimeout(() => {
+        new QRCode(document.getElementById(qrId), {
+            text: cardData.qrData,
+            width: 100,
+            height: 100
+        });
+    }, 100);
+    
+    return `
+        <div class="card-preview">
+            <img src="${cardBackgroundDataUrl}" class="card-background" alt="Background" crossorigin="anonymous">
+            <img src="${cardData.clubLogo}" class="card-logo" alt="Logo">
+            <div class="card-club-name">
+                <h2>${cardData.clubName}</h2>
+                <div class="card-subtitle">Official Member Card – Kyokushinkai Karate-Do</div>
+            </div>
+            <div class="card-info">
+                <div class="card-info-box">
+                    <div class="card-info-label">ID</div>
+                    <div class="card-info-value">${cardData.memberId}</div>
                 </div>
-            `;
-        }
+                <div class="card-info-box">
+                    <div class="card-info-label">FAMILY NAME</div>
+                    <div class="card-info-value">${cardData.memberName.split(' ')[0]}</div>
+                </div>
+                <div class="card-info-box">
+                    <div class="card-info-label">FIRST NAME</div>
+                    <div class="card-info-value">${cardData.memberName.split(' ')[1] || ''}</div>
+                </div>
+                <div class="card-info-box half-width">
+                    <div class="card-info-label">DATE OF BIRTH</div>
+                    <div class="card-info-value">${cardData.dob}</div>
+                </div>
+                <div class="card-info-box half-width">
+                    <div class="card-info-label">BLOOD TYPE / زمرة الدم</div>
+                    <div class="card-info-value">${cardData.bloodType}</div>
+                </div>
+            </div>
+            <div class="card-qr">
+                <div id="${qrId}"></div>
+            </div>
+        </div>
+    `;
+}
+
         
         // Clear Generated Cards
         function clearGeneratedCards() {
