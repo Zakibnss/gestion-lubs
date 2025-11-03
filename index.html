@@ -559,7 +559,6 @@
             <div id="scanResult"></div>
         </div>
         <div id="attendance" class="tab-content">
-            <!-- ... identique ... -->
             <h2>Historique des Présences</h2>
             <div class="form-group">
                 <label>🔍 Recherche</label>
@@ -618,6 +617,12 @@
             // QR Upload (mobile)
             if (document.getElementById('qrFileInput')) {
                 document.getElementById('qrFileInput').addEventListener('change', handleQrFileInput);
+            }
+            // Recherche sur présences
+            if (document.getElementById('attendanceSearch')) {
+                document.getElementById('attendanceSearch').addEventListener('input', function() {
+                    loadAttendance(this.value.trim());
+                });
             }
         });
 
@@ -945,18 +950,7 @@
         // -------- Scanner de présence --------
 
         /**
-         * Enregistre la présence d'un adhérent dans la table 'attendance'.
-         * Si votre table n'a PAS une colonne 'created_at' (timestamp automatique), 
-         * il FAUT modifier la clé utilisée ci-dessous !
-         *
-         * Ex:
-         *   const presenceData = {
-         *       member_id: String(member.id),
-         *       last_name: String(member.last_name ?? ''),
-         *       first_name: String(member.first_name ?? ''),
-         *       subscription_status: isSubscriptionActive(member.start_date, member.subscription) ? "ACTIF" : "EXPIRÉ",
-         *       created_at: now.toISOString() // <-- Adaptez ce nom de colonne si besoin !
-         *   };
+         * Enregistre la présence d'un adhérent dans la table 'presences'.
          */
         async function markPresenceForMemberId(athleteId) {
             if (!athleteId || !athleteId.trim()) {
@@ -966,7 +960,7 @@
             // Récupérer les infos du membre à partir de l'id athlète
             const { data: member, error } = await supabase
                 .from('members')
-                .select('*, clubs(name)')
+                .select('*, clubs(id, name)')
                 .eq('id', athleteId.trim())
                 .single();
 
@@ -976,56 +970,33 @@
                 return;
             }
 
-            // Pour que l'insertion marche, vérifiez le schéma de la table 'attendance' sur Supabase
-            // Remplacez le nom de colonne 'created_at' dans presenceData ci-dessous si besoin :
-            
             const now = new Date();
 
-            // 💡 MODIFIEZ 'created_at' ICI si votre schéma attend un autre nom (ex: 'date_time', 'timestamp', etc.)
+            // Construction des données à sauvegarder dans la table 'presences'
             let presenceData = {
-    member_id: String(member.id),
-    club_id: member.clubs?.id || null,
-    last_name: String(member.lastname ?? ''),
-    first_name: String(member.firstname ?? ''),
-    status: isSubscriptionActive(member.startdate, member.subscription) ? 'ACTIVE' : 'EXPIRED',
-    timestamp: now.toISOString()
-};
+                member_id: String(member.id),
+                last_name: String(member.last_name ?? ''),
+                first_name: String(member.first_name ?? ''),
+                club_name: member.clubs?.name ?? '',
+                status: isSubscriptionActive(member.start_date, member.subscription) ? "ACTIF" : "EXPIRÉ",
+                created_at: now.toISOString()
+            };
 
-
-
-            // -- TEST colonne 'created_at' existante dans le schéma côté Supabase --
-            // Si l'insertion renvoie une erreur 'column "created_at" does not exist' :
-            // - Adaptez la ligne ci-dessus (dans presenceData) pour correspondre exactement à votre base SQL !
-
+            // Ajout dans la table presences
             const { error: insertErr } = await supabase
-                .from('attendance')
+                .from('presences')
                 .insert([presenceData]);
             
             if (insertErr) {
                 let extraHelp = '';
-                if (
-                    insertErr.message && 
-                    (
-                        insertErr.message.toLowerCase().includes("column") || 
-                        insertErr.message.toLowerCase().includes("schema cache")
-                    )
-                ) {
-                    // Affichage explicite du message spécial demandé :
-                    extraHelp += `<br>
-                        <div style="color:#c00;margin-top:8px">
-                        Could not find the 'created_at' column of 'attendance' in the schema cache
-                        </div>
-                        <div style="margin-top:8px">
-                        <i>Vérifiez le nom des colonnes dans la table 'attendance' sur Supabase. Colonne attendue : 'created_at'. Si elle s'appelle autrement, adaptez ce code&nbsp;!</i>
-                        </div>
-                    `;
-                }
                 scanResultDiv.innerHTML = `<div class="alert alert-danger">Erreur lors de l'enregistrement de la présence<br>${insertErr.message}${extraHelp}</div>`;
             } else {
                 scanResultDiv.innerHTML = `<div class="alert alert-success">
-                Présence validée pour : <b>${member.id} - ${member.last_name} ${member.first_name}</b> [${presenceData.subscription_status}]<br>
+                Présence validée pour : <b>${member.id} - ${member.last_name} ${member.first_name}</b> [${presenceData.status}]<br>
                 Date/Heure : ${now.toLocaleString()}
                 </div>`;
+                // Mise à jour de la liste des présences
+                loadAttendance();
             }
         }
 
@@ -1155,7 +1126,52 @@
             reader.readAsDataURL(qrFile);
         }
 
-        function loadAttendance() {}
+        // Affichage des présences
+        async function loadAttendance(search = "") {
+            // Récupérer les présences (table 'presences'), jointure nom club/adhérent
+            let query = supabase.from('presences')
+                .select('*')
+                .order('created_at', {ascending: false})
+                .limit(200);
+
+            let filterSearch = search.trim().toLowerCase();
+
+            let { data: presences, error } = await query;
+            if (error) {
+                document.getElementById('attendanceTableBody').innerHTML = `<tr><td colspan="6">Erreur chargement présences: ${error.message}</td></tr>`;
+                return;
+            }
+            if (!Array.isArray(presences)) presences = [];
+            // Filtrer localement si besoin (serveur: possible d'utiliser une requête SQL avec filter)
+            if (filterSearch) {
+                presences = presences.filter(pr =>
+                    (pr.member_id && pr.member_id.toLowerCase().includes(filterSearch)) ||
+                    (pr.last_name && pr.last_name.toLowerCase().includes(filterSearch)) ||
+                    (pr.first_name && pr.first_name.toLowerCase().includes(filterSearch)) ||
+                    (pr.club_name && pr.club_name.toLowerCase().includes(filterSearch))
+                );
+            }
+            const tbody = document.getElementById('attendanceTableBody');
+            tbody.innerHTML = '';
+            if (!presences.length) {
+                tbody.innerHTML = '<tr><td colspan="6">Aucune présence enregistrée</td></tr>';
+                return;
+            }
+            presences.forEach(pr => {
+                let dt = pr.created_at ? new Date(pr.created_at) : null;
+                let formDt = dt ? dt.toLocaleString('fr-FR') : '';
+                let clubDisplay = pr.club_name || '';
+                tbody.innerHTML += `<tr>
+                    <td>${formDt}</td>
+                    <td>${pr.member_id || ''}</td>
+                    <td>${pr.last_name || ''}</td>
+                    <td>${pr.first_name || ''}</td>
+                    <td>${clubDisplay}</td>
+                    <td><span class="badge ${pr.status === 'ACTIF' ? 'badge-success':'badge-danger'}">${pr.status || ''}</span></td>
+                </tr>`;
+            });
+        }
+
         function exportMembersExcel() { alert('Export Excel non implémenté dans cette version.'); }
         function importMembers() { alert('Import Excel/CSV non implémenté dans cette version.'); }
         function exportAttendanceExcel() { alert('Export de présence non implémenté dans cette version.'); }
@@ -1166,6 +1182,8 @@
             if (document.getElementById('scanner').classList.contains('active')) {
                 if(isMobileDevice()) showQrFileUpload(true);
             }
+            // Chargement auto de l'historique des présences
+            loadAttendance();
         };
     </script>
   </body>
