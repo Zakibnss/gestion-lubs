@@ -983,12 +983,14 @@
 
             // 💡 MODIFIEZ 'created_at' ICI si votre schéma attend un autre nom (ex: 'date_time', 'timestamp', etc.)
             let presenceData = {
-                member_id: String(member.id),
-                last_name: String(member.last_name ?? ''),
-                first_name: String(member.first_name ?? ''),
-                subscription_status: isSubscriptionActive(member.start_date, member.subscription) ? "ACTIF" : "EXPIRÉ",
-                created_at: now.toISOString()
-            };
+    member_id: String(member.id),
+    last_name: String(member.lastname ?? ''),
+    first_name: String(member.firstname ?? ''),
+    club_id: member.clubs?.id || null,  // Ajout du club_id
+    subscription_status: isSubscriptionActive(member.startdate, member.subscription) ? 'ACTIF' : 'EXPIRÉ',
+    timestamp: now.toISOString()  // ✅ Utilisez timestamp au lieu de created_at
+};
+
 
             // -- TEST colonne 'created_at' existante dans le schéma côté Supabase --
             // Si l'insertion renvoie une erreur 'column "created_at" does not exist' :
