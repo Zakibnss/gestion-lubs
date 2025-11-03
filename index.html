@@ -950,7 +950,7 @@
         // -------- Scanner de présence --------
 
         /**
-         * Enregistre la présence d'un adhérent dans la table 'presences'.
+         * Enregistre la présence d'un adhérent dans la table 'attendance'.
          */
         async function markPresenceForMemberId(athleteId) {
             if (!athleteId || !athleteId.trim()) {
@@ -972,39 +972,26 @@
 
             const now = new Date();
 
-            // Construction des données à sauvegarder dans la table 'presences'
+            // Correction des noms de champs pour correspondre à la structure de la table 'attendance'
             let presenceData = {
                 member_id: String(member.id),
-                last_name: String(member.last_name ?? ''),
-                first_name: String(member.first_name ?? ''),
-                club_name: member.clubs?.name ?? '',
-                status: isSubscriptionActive(member.start_date, member.subscription) ? "ACTIF" : "EXPIRÉ",
-                created_at: now.toISOString()
+                club_id: member.clubs?.id || null,
+                last_name: String(member.last_name ?? ''), // Correction ici
+                first_name: String(member.first_name ?? ''), // Correction ici
+                status: isSubscriptionActive(member.start_date, member.subscription) ? 'ACTIVE' : 'EXPIRED', // Correction des champs et de la logique
+                timestamp: now.toISOString()
             };
 
-            // Ajout dans la table presences
             const { error: insertErr } = await supabase
-                .from('presences')
-                .insert([presenceData]);
-            
+                .from('attendance')
+                .insert(presenceData);
+
             if (insertErr) {
-                let extraHelp = '';
-                // Custom error message for missing presences table
-                if (
-                    insertErr.message &&
-                    insertErr.message.toLowerCase().includes("could not find the table 'public.presences' in the schema cache")
-                ) {
-                    extraHelp = "<br><span style='color:#8a6d3b'>La table <b>presences</b> n'existe pas dans la base de données Supabase. Contactez votre administrateur technique ou créez la table <b>public.presences</b>.<br>Erreur technique détectée.</span>";
-                }
-                scanResultDiv.innerHTML = `<div class="alert alert-danger">Erreur lors de l'enregistrement de la présence<br>${insertErr.message}${extraHelp}</div>`;
-            } else {
-                scanResultDiv.innerHTML = `<div class="alert alert-success">
-                Présence validée pour : <b>${member.id} - ${member.last_name} ${member.first_name}</b> [${presenceData.status}]<br>
-                Date/Heure : ${now.toLocaleString()}
-                </div>`;
-                // Mise à jour de la liste des présences
-                loadAttendance();
+                scanResultDiv.innerHTML = `<div class="alert alert-danger">Erreur lors de l'enregistrement de la présence: ${insertErr.message}</div>`;
+                return;
             }
+            // Affiche la confirmation de présence
+            scanResultDiv.innerHTML = `<div class="alert alert-success">Présence enregistrée pour <b>${presenceData.member_id} - ${presenceData.last_name} ${presenceData.first_name}</b> (Statut abonnement: <span class="badge ${presenceData.status === "ACTIVE" ? "badge-success" : "badge-danger"}">${presenceData.status}</span>)</div>`;
         }
 
         function isValidQrMemberId(qrContent) {
@@ -1135,10 +1122,15 @@
 
         // Affichage des présences
         async function loadAttendance(search = "") {
-            // Récupérer les présences (table 'presences'), jointure nom club/adhérent
-            let query = supabase.from('presences')
-                .select('*')
-                .order('created_at', {ascending: false})
+            // Requête jointure sur attendance pour récupérer info club (nécessite une relation Foreign Key côté BDD, sinon on laisse vide)
+            let query = supabase.from('attendance')
+                .select(`
+                    *,
+                    clubs (
+                        name
+                    )
+                `)
+                .order('timestamp', { ascending: false })
                 .limit(200);
 
             let filterSearch = search.trim().toLowerCase();
@@ -1156,13 +1148,13 @@
                 return;
             }
             if (!Array.isArray(presences)) presences = [];
-            // Filtrer localement si besoin (serveur: possible d'utiliser une requête SQL avec filter)
+            // Correction: filtrage sur pr.clubs.name et pr.member_id/last_name/first_name
             if (filterSearch) {
                 presences = presences.filter(pr =>
                     (pr.member_id && pr.member_id.toLowerCase().includes(filterSearch)) ||
                     (pr.last_name && pr.last_name.toLowerCase().includes(filterSearch)) ||
                     (pr.first_name && pr.first_name.toLowerCase().includes(filterSearch)) ||
-                    (pr.club_name && pr.club_name.toLowerCase().includes(filterSearch))
+                    (pr.clubs && pr.clubs.name && pr.clubs.name.toLowerCase().includes(filterSearch))
                 );
             }
             const tbody = document.getElementById('attendanceTableBody');
@@ -1172,18 +1164,22 @@
                 return;
             }
             presences.forEach(pr => {
-                let dt = pr.created_at ? new Date(pr.created_at) : null;
+                let dt = pr.timestamp ? new Date(pr.timestamp) : null;
                 let formDt = dt ? dt.toLocaleString('fr-FR') : '';
-                let clubDisplay = pr.club_name || '';
-                tbody.innerHTML += `<tr>
-                    <td>${formDt}</td>
-                    <td>${pr.member_id || ''}</td>
-                    <td>${pr.last_name || ''}</td>
-                    <td>${pr.first_name || ''}</td>
-                    <td>${clubDisplay}</td>
-                    <td><span class="badge ${pr.status === 'ACTIF' ? 'badge-success':'badge-danger'}">${pr.status || ''}</span></td>
-                </tr>`;
+                let clubDisplay = pr.clubs ? pr.clubs.name : 'N/A';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${formDt}</td>
+                        <td>${pr.member_id}</td>
+                        <td>${pr.last_name}</td>
+                        <td>${pr.first_name}</td>
+                        <td>${clubDisplay}</td>
+                        <td><span class="badge ${pr.status === 'ACTIVE' ? 'badge-success':'badge-danger'}">${pr.status}</span></td>
+                    </tr>
+                `;
             });
+
         }
 
         function exportMembersExcel() { alert('Export Excel non implémenté dans cette version.'); }
@@ -1200,5 +1196,5 @@
             loadAttendance();
         };
     </script>
-  </body>
+</body>
 </html>
