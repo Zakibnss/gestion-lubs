@@ -944,11 +944,20 @@
 
         // -------- Scanner de présence --------
 
-        // Correction : la présence se valide (insertion Supabase) sans 400 Bad Request (types et columns corrects)
-        // Correction apportée ici : Use only valid column names as present in attendance table.
-        // Erreur probable : la colonne de timestamp n'est pas "date_time" mais "created_at" (ou "timestamp", "datetime", etc.)
-        // Pour fixer, remplacer "date_time" par "created_at"
-        // Et s'assurer que .insert ne transmet QUE les colonnes existantes !
+        /**
+         * Enregistre la présence d'un adhérent dans la table 'attendance'.
+         * Si votre table n'a PAS une colonne 'created_at' (timestamp automatique), 
+         * il FAUT modifier la clé utilisée ci-dessous !
+         *
+         * Ex:
+         *   const presenceData = {
+         *       member_id: String(member.id),
+         *       last_name: String(member.last_name ?? ''),
+         *       first_name: String(member.first_name ?? ''),
+         *       subscription_status: isSubscriptionActive(member.start_date, member.subscription) ? "ACTIF" : "EXPIRÉ",
+         *       created_at: now.toISOString() // <-- Adaptez ce nom de colonne si besoin !
+         *   };
+         */
         async function markPresenceForMemberId(athleteId) {
             if (!athleteId || !athleteId.trim()) {
                 document.getElementById('scanResult').innerHTML = `<div class="alert alert-danger">Veuillez entrer l'ID athlète</div>`;
@@ -967,17 +976,13 @@
                 return;
             }
 
-            // FIXME: Récupérer le vrai schéma existant de la table attendance
-            // Découverte automatique des colonnes valides en expliquant la correction :
-            // - Supabase 400 Bad Request si un champ insert n'existe pas
-            // - Il FAUT utiliser uniquement les vrais noms !
-            // Pour l'exemple ici, remplaçons "date_time" => "created_at"
-            // => member_id, last_name, first_name, subscription_status, created_at
-            // Si votre table a un autre nom de colonne, ADAPTEZ ICI.
-
+            // Pour que l'insertion marche, vérifiez le schéma de la table 'attendance' sur Supabase
+            // Remplacez le nom de colonne 'created_at' dans presenceData ci-dessous si besoin :
+            
             const now = new Date();
-            // Remplacer "date_time" par "created_at"
-            const presenceData = {
+
+            // 💡 MODIFIEZ 'created_at' ICI si votre schéma attend un autre nom (ex: 'date_time', 'timestamp', etc.)
+            let presenceData = {
                 member_id: String(member.id),
                 last_name: String(member.last_name ?? ''),
                 first_name: String(member.first_name ?? ''),
@@ -985,16 +990,32 @@
                 created_at: now.toISOString()
             };
 
-            // Insérer uniquement les champs ci-dessus (ne surtout pas transmettre 'date_time' si la table ne l'a pas !)
+            // -- TEST colonne 'created_at' existante dans le schéma côté Supabase --
+            // Si l'insertion renvoie une erreur 'column "created_at" does not exist' :
+            // - Adaptez la ligne ci-dessus (dans presenceData) pour correspondre exactement à votre base SQL !
+
             const { error: insertErr } = await supabase
                 .from('attendance')
                 .insert([presenceData]);
             
             if (insertErr) {
                 let extraHelp = '';
-                // Spécifique erreur colonne inconnue côté Supabase
-                if (insertErr.message && insertErr.message.toLowerCase().includes("column")) {
-                    extraHelp += "<br><i>Vérifiez le nom des colonnes dans la table 'attendance' sur Supabase. Colonne attendue : 'created_at'. Si elle s'appelle autrement, adaptez ce code !</i>";
+                if (
+                    insertErr.message && 
+                    (
+                        insertErr.message.toLowerCase().includes("column") || 
+                        insertErr.message.toLowerCase().includes("schema cache")
+                    )
+                ) {
+                    // Affichage explicite du message spécial demandé :
+                    extraHelp += `<br>
+                        <div style="color:#c00;margin-top:8px">
+                        Could not find the 'created_at' column of 'attendance' in the schema cache
+                        </div>
+                        <div style="margin-top:8px">
+                        <i>Vérifiez le nom des colonnes dans la table 'attendance' sur Supabase. Colonne attendue : 'created_at'. Si elle s'appelle autrement, adaptez ce code&nbsp;!</i>
+                        </div>
+                    `;
                 }
                 scanResultDiv.innerHTML = `<div class="alert alert-danger">Erreur lors de l'enregistrement de la présence<br>${insertErr.message}${extraHelp}</div>`;
             } else {
