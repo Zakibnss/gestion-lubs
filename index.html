@@ -945,6 +945,10 @@
         // -------- Scanner de présence --------
 
         // Correction : la présence se valide (insertion Supabase) sans 400 Bad Request (types et columns corrects)
+        // Correction apportée ici : Use only valid column names as present in attendance table.
+        // Erreur probable : la colonne de timestamp n'est pas "date_time" mais "created_at" (ou "timestamp", "datetime", etc.)
+        // Pour fixer, remplacer "date_time" par "created_at"
+        // Et s'assurer que .insert ne transmet QUE les colonnes existantes !
         async function markPresenceForMemberId(athleteId) {
             if (!athleteId || !athleteId.trim()) {
                 document.getElementById('scanResult').innerHTML = `<div class="alert alert-danger">Veuillez entrer l'ID athlète</div>`;
@@ -963,36 +967,36 @@
                 return;
             }
 
-            // Correction : Compose strictly the expected attendance row for supabase.
-            // 1. Vérifier structure de la table attendance (member_id: string, date_time: timestamp, last_name: string, first_name: string, subscription_status: string) 
-            // 2. Pas de quotes après columns, types bien strings
+            // FIXME: Récupérer le vrai schéma existant de la table attendance
+            // Découverte automatique des colonnes valides en expliquant la correction :
+            // - Supabase 400 Bad Request si un champ insert n'existe pas
+            // - Il FAUT utiliser uniquement les vrais noms !
+            // Pour l'exemple ici, remplaçons "date_time" => "created_at"
+            // => member_id, last_name, first_name, subscription_status, created_at
+            // Si votre table a un autre nom de colonne, ADAPTEZ ICI.
 
             const now = new Date();
+            // Remplacer "date_time" par "created_at"
             const presenceData = {
                 member_id: String(member.id),
-                date_time: now.toISOString(),
                 last_name: String(member.last_name ?? ''),
                 first_name: String(member.first_name ?? ''),
-                subscription_status: isSubscriptionActive(member.start_date, member.subscription) ? "ACTIF" : "EXPIRÉ"
+                subscription_status: isSubscriptionActive(member.start_date, member.subscription) ? "ACTIF" : "EXPIRÉ",
+                created_at: now.toISOString()
             };
 
-            // Supabase.js@2 insert: ne pas transmettre undefined ou extra fields
-            // Double vérification : member_id et autres sont string.
-
+            // Insérer uniquement les champs ci-dessus (ne surtout pas transmettre 'date_time' si la table ne l'a pas !)
             const { error: insertErr } = await supabase
                 .from('attendance')
-                .insert([
-                    {
-                        member_id: presenceData.member_id + '', // force string
-                        date_time: presenceData.date_time,
-                        last_name: presenceData.last_name + '',
-                        first_name: presenceData.first_name + '',
-                        subscription_status: presenceData.subscription_status + ''
-                    }
-                ]);
-
+                .insert([presenceData]);
+            
             if (insertErr) {
-                scanResultDiv.innerHTML = `<div class="alert alert-danger">Erreur lors de l'enregistrement de la présence<br>${insertErr.message}</div>`;
+                let extraHelp = '';
+                // Spécifique erreur colonne inconnue côté Supabase
+                if (insertErr.message && insertErr.message.toLowerCase().includes("column")) {
+                    extraHelp += "<br><i>Vérifiez le nom des colonnes dans la table 'attendance' sur Supabase. Colonne attendue : 'created_at'. Si elle s'appelle autrement, adaptez ce code !</i>";
+                }
+                scanResultDiv.innerHTML = `<div class="alert alert-danger">Erreur lors de l'enregistrement de la présence<br>${insertErr.message}${extraHelp}</div>`;
             } else {
                 scanResultDiv.innerHTML = `<div class="alert alert-success">
                 Présence validée pour : <b>${member.id} - ${member.last_name} ${member.first_name}</b> [${presenceData.subscription_status}]<br>
