@@ -885,40 +885,6 @@
             loadDashboard();
             loadClubs();
         };
-        function decodeAndShowQrContents(rawText) {
-                 let obj = null;
-                 try { obj = JSON.parse(rawText); } catch(e) { alert("QR code inconnu"); return; }
-                 if (obj && obj.id && obj.nom && obj.prenom && obj.dob && obj.end_date && obj.status) {
-                    document.write("<h2>Données Carte Adhérent :</h2><ul>"+
-                      `<li><b>ID</b>: ${obj.id}</li>` +
-                      `<li><b>Nom</b>: ${obj.nom}</li>` +
-                      `<li><b>Prénom</b>: ${obj.prenom}</li>` +
-                      `<li><b>Date de naissance</b>: ${obj.dob}</li>` +
-                      `<li><b>Date Fin Abonnement</b>: ${obj.end_date}</li>` +
-                      `<li><b>Statut Abonnement</b>: ${obj.status}</li>` +
-                      "</ul>");
-                 } else { document.write("<b>QR Code format inconnu ou incomplet.</b>"); }
-               }
-             </script>
-         
-        // -------------------------------
-        // QR CODE LECTURE : Deux méthodes
-        // -------------------------------
-
-        /**
-         * OPTIONS DE LECTURE D'UNE CARTE D'ADHÉRENT (QR CODE)
-         *
-         * 1) Lecture DANS L'APPLICATION ("in the app"):
-         *    - Utilisez l'onglet "Scanner" de l'application pour scanner le QR code d'une carte.
-         *    - Résultat : Présence enregistrée dans la base, affichage des informations complètes du membre.
-         *    - Fonctionne même hors ligne pour lecture simple (si le QR contient toutes les datas).
-         *
-         * 2) Lecture HORS DE L'APPLICATION ("out of app") : 
-         *    - Solution rapide : vous pouvez copier-coller le script ci-dessous dans n'importe quelle page HTML, puis scanner ou coller* le contenu décodé du QR code de la carte pour voir les infos, sans l'app.
-         *
-         *    <script>
-       
-
     </script>
 </body>
 </html>
