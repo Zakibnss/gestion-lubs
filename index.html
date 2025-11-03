@@ -1613,11 +1613,12 @@ async function generateSingleCard(memberId) {
             reader.readAsArrayBuffer(file);
         }
         
-        // Initialize on load
-        window.onload = function() {
+               // Initialize on load
+        window.addEventListener('load', function() {
+            setupCardBackgroundUpload();
             loadDashboard();
             loadClubs();
-        };
+        });
     </script>
 </body>
 </html>
