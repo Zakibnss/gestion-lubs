@@ -944,7 +944,7 @@
 
         // -------- Scanner de présence --------
 
-        // Modification : la présence se valide par id athletic (id athlète)
+        // Correction : la présence se valide (insertion Supabase) sans 400 Bad Request (types et columns corrects)
         async function markPresenceForMemberId(athleteId) {
             if (!athleteId || !athleteId.trim()) {
                 document.getElementById('scanResult').innerHTML = `<div class="alert alert-danger">Veuillez entrer l'ID athlète</div>`;
@@ -963,20 +963,33 @@
                 return;
             }
 
-            // Marquer la présence dans une table "attendance"
+            // Correction : Compose strictly the expected attendance row for supabase.
+            // 1. Vérifier structure de la table attendance (member_id: string, date_time: timestamp, last_name: string, first_name: string, subscription_status: string) 
+            // 2. Pas de quotes après columns, types bien strings
+
             const now = new Date();
             const presenceData = {
-                member_id: member.id,
+                member_id: String(member.id),
                 date_time: now.toISOString(),
-                last_name: member.last_name,
-                first_name: member.first_name,
-                // club_name (optionnel) non utilisé par défaut
+                last_name: String(member.last_name ?? ''),
+                first_name: String(member.first_name ?? ''),
                 subscription_status: isSubscriptionActive(member.start_date, member.subscription) ? "ACTIF" : "EXPIRÉ"
             };
 
+            // Supabase.js@2 insert: ne pas transmettre undefined ou extra fields
+            // Double vérification : member_id et autres sont string.
+
             const { error: insertErr } = await supabase
                 .from('attendance')
-                .insert([presenceData]);
+                .insert([
+                    {
+                        member_id: presenceData.member_id + '', // force string
+                        date_time: presenceData.date_time,
+                        last_name: presenceData.last_name + '',
+                        first_name: presenceData.first_name + '',
+                        subscription_status: presenceData.subscription_status + ''
+                    }
+                ]);
 
             if (insertErr) {
                 scanResultDiv.innerHTML = `<div class="alert alert-danger">Erreur lors de l'enregistrement de la présence<br>${insertErr.message}</div>`;
