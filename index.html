@@ -641,65 +641,75 @@
                 // Variable globale pour stocker l'arrière-plan
 let cardBackgroundDataUrl = '';
 
-// Upload Card Background avec compression
-// Variable pour stocker l'URL de l'arrière-plan
-let cardBackgroundDataUrl = '';
 
-// Upload Card Background dans Supabase Storage
-function setupCardBackgroundUpload() {
-    const input = document.getElementById('cardBackground');
-    if (!input) return;
-    
-    input.addEventListener('change', async function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        // Vérifier la taille (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            alert('❌ Fichier trop grand. Maximum 5MB.');
-            e.target.value = '';
-            return;
+        let cardBackgroundDataUrl = '';
+        let generatedCards = [];
+
+        // Upload Background dans Supabase Storage
+        async function setupCardBackgroundUpload() {
+            const input = document.getElementById('cardBackground');
+            if (!input) return;
+            
+            input.addEventListener('change', async function(e) {
+
+                    input.addEventListener('change', async function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                // Vérifier la taille (max 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('❌ Fichier trop grand. Maximum 5MB.');
+                    e.target.value = '';
+                    return;
+                }
+                
+                // Vérifier le type
+                if (!file.type.startsWith('image/')) {
+                    alert('❌ Veuillez sélectionner une image.');
+                    e.target.value = '';
+                    return;
+                }
+                
+                try {
+                    // Nom unique pour le fichier
+                    const fileName = `background-${Date.now()}.jpg`;
+                    
+                    // Upload vers Supabase Storage
+                    const { data, error } = await supabase.storage
+                        .from('card-backgrounds')
+                        .upload(fileName, file, {
+                            cacheControl: '3600',
+                            upsert: false
+                        });
+                    
+                    if (error) {
+                        throw error;
+                    }
+                    
+                    // Obtenir l'URL publique
+                    const { data: publicUrlData } = supabase.storage
+                        .from('card-backgrounds')
+                        .getPublicUrl(fileName);
+                    
+                    cardBackgroundDataUrl = publicUrlData.publicUrl;
+                    
+                    console.log('✅ Background uploadé:', cardBackgroundDataUrl);
+                    alert('✅ Arrière-plan uploadé avec succès !');
+                    
+                } catch (error) {
+                    console.error('Erreur upload:', error);
+                    alert('❌ Erreur lors de l\'upload: ' + error.message);
+                }
+            });
         }
         
-        // Vérifier le type
-        if (!file.type.startsWith('image/')) {
-            alert('❌ Veuillez sélectionner une image.');
-            e.target.value = '';
-            return;
-        }
-        
-        try {
-            // Nom unique pour le fichier
-            const fileName = `background-${Date.now()}.jpg`;
-            
-            // Upload vers Supabase Storage
-            const { data, error } = await supabase.storage
-                .from('card-backgrounds')
-                .upload(fileName, file, {
-                    cacheControl: '3600',
-                    upsert: false
-                });
-            
-            if (error) {
-                throw error;
-            }
-            
-            // Obtenir l'URL publique
-            const { data: publicUrlData } = supabase.storage
-                .from('card-backgrounds')
-                .getPublicUrl(fileName);
-            
-            cardBackgroundDataUrl = publicUrlData.publicUrl;
-            
-            console.log('✅ Background uploadé:', cardBackgroundDataUrl);
-            alert('✅ Arrière-plan uploadé avec succès !');
-            
-        } catch (error) {
-            console.error('Erreur upload:', error);
-            alert('❌ Erreur lors de l\'upload: ' + error.message);
-        }
-    });
-}
+        // Initialiser au chargement
+        window.addEventListener('load', function() {
+            setupCardBackgroundUpload();
+            loadDashboard();
+            loadClubs();
+        });
+
 
 
 // Appeler au chargement de la page
