@@ -6,7 +6,7 @@
     <title>Gestion Club Kyokushin - Supabase</title>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- QR Code Library -->
+    <!-- QR Code Library (use latest && fix container overflow) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <!-- HTML2Canvas for PNG Export -->
@@ -288,6 +288,18 @@
         border-radius: 8px;
         border: 2px solid white;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        width: 70px;
+        height: 70px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+    .card-qr canvas, .card-qr img {
+        max-width: 100% !important;
+        max-height: 100% !important;
+        display: block;
+        margin: auto;
     }
     /* Scanner Styles */
     #qr-reader {
@@ -747,6 +759,7 @@
             });
         }
 
+        // Réécriture pour garantir l'intégrité du QR code (et qu'il reste 100% affiché, sans overflow, supprimant innerHTML de QR)
         async function generateMultipleCards() {
             const select = document.getElementById('cardMemberSelect');
             const selectedIds = Array.from(select.selectedOptions).map(o => o.value);
@@ -827,37 +840,41 @@
                     <div class="card-info-label">Groupe Sanguin</div>
                     <div class="card-info-value">${member.blood_type || ""}</div>
                 </div>`);
-                
                 infoDiv.innerHTML = boxes.join('');
 
-                // QR code for ID
+                // --- Fix QR code: ne pas reset le container (éviter innerHTML), forcer removal du précédent node enfant, puis append ---
                 const qrDiv = document.createElement('div');
                 qrDiv.className = "card-qr";
                 qrDiv.style.width = '70px';
                 qrDiv.style.height = '70px';
-                setTimeout(() => {
-                    qrDiv.innerHTML = '';
-                    // Déterminer le statut de l'abonnement
-                    const abonnementActif = isSubscriptionActive(member.start_date, member.subscription);
-                    // Rassembler les infos importantes pour le QR Code
-                    const formattedMember = {
-                        id: member.id,
-                        nom: member.last_name,
-                        prenom: member.first_name,
-                        club: member.clubs && member.clubs.name ? member.clubs.name : "",
-                        date_naissance: fmtDate(member.dob),
-                        groupe_sanguin: member.blood_type || "",
-                        start_date: fmtDate(member.start_date),
-                        duree_abonnement: member.subscription,
-                        date_fin: endDate,
-                        abonnement_status: abonnementActif ? 'ACTIF' : 'EXPIRÉ'
-                    };
-                    new QRCode(qrDiv, {
-                        text: JSON.stringify(formattedMember, null, 0),
-                        width: 50,
-                        height: 50
-                    });
-                }, 0);
+                // On force la génération synchrone (sans setTimeout) car QRCode.js injecte un canvas/image
+                // et si innerHTML est changé, le canvas peut être écrasé.
+                // 1. Nettoie tout enfant du container (ex: overlay/redraw dans un usage répété)
+                while (qrDiv.firstChild) qrDiv.removeChild(qrDiv.firstChild);
+                // 2. Formatter les données
+                const abonnementActif = isSubscriptionActive(member.start_date, member.subscription);
+                const formattedMember = {
+                    id: member.id,
+                    nom: member.last_name,
+                    prenom: member.first_name,
+                    club: member.clubs && member.clubs.name ? member.clubs.name : "",
+                    date_naissance: fmtDate(member.dob),
+                    groupe_sanguin: member.blood_type || "",
+                    start_date: fmtDate(member.start_date),
+                    duree_abonnement: member.subscription,
+                    date_fin: endDate,
+                    abonnement_status: abonnementActif ? 'ACTIF' : 'EXPIRÉ'
+                };
+                // On fournit la DIV pure pour QRCode.js
+                let qrcode = new QRCode(qrDiv, {
+                    text: JSON.stringify(formattedMember, null, 0),
+                    width: 54,
+                    height: 54,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+                // Astuce : s'assurer que le QR code insère son image/canvas au format adapté par le CSS !
 
                 previewDiv.appendChild(bgImg);
                 previewDiv.appendChild(logoImg);
