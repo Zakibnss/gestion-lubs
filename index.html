@@ -579,21 +579,47 @@
         }
 
         // Add Club
+        /**
+         * Nouvelle version : l'image/logo du club est uploadée dans le bucket Supabase "club-logos"
+         * puis on stocke seulement l'URL publique dans la table "clubs".
+         */
         async function addClub() {
             const name = document.getElementById('clubName').value.trim();
             const logoFile = document.getElementById('clubLogo').files[0];
             if (!name || !logoFile) { alert('Veuillez remplir tous les champs'); return; }
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                const clubData = { name: name, logo: e.target.result, created_at: new Date().toISOString() };
-                const { error } = await supabase.from('clubs').insert([clubData]);
-                if (error) { alert('Erreur: ' + error.message); return; }
-                alert('Club ajouté avec succès !');
-                document.getElementById('clubName').value = '';
-                document.getElementById('clubLogo').value = '';
-                loadClubs();
-            };
-            reader.readAsDataURL(logoFile);
+
+            // 1. Upload image to Supabase bucket
+            const fileExt = logoFile.name.split('.').pop();
+            const fileName = `club_${Date.now()}.${fileExt}`;
+            const filePath = `logos/${fileName}`;
+
+            // Supabase V2 API
+            let { data: uploadData, error: uploadError } = await supabase.storage
+                .from('club-logos')
+                .upload(filePath, logoFile, { upsert: true });
+
+            if (uploadError) {
+                alert("Erreur d'envoi du logo : " + uploadError.message);
+                return;
+            }
+
+            // 2. Get the public URL
+            const { data: publicUrlData } = supabase.storage.from('club-logos').getPublicUrl(filePath);
+            const logoUrl = publicUrlData && publicUrlData.publicUrl ? publicUrlData.publicUrl : '';
+
+            if (!logoUrl) {
+                alert("Erreur : l'URL publique du logo n'a pas pu être obtenue.");
+                return;
+            }
+
+            // 3. Save in DB
+            const clubData = { name: name, logo: logoUrl, created_at: new Date().toISOString() };
+            const { error } = await supabase.from('clubs').insert([clubData]);
+            if (error) { alert('Erreur: ' + error.message); return; }
+            alert('Club ajouté avec succès !');
+            document.getElementById('clubName').value = '';
+            document.getElementById('clubLogo').value = '';
+            loadClubs();
         }
 
         // Load Clubs
@@ -604,7 +630,8 @@
             clubs.forEach(club => {
                 const clubDiv = document.createElement('div');
                 clubDiv.style.cssText = 'background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; align-items: center; gap: 15px;';
-                clubDiv.innerHTML = `<img src="${club.logo}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;"><div><h4 style="margin: 0;">${club.name}</h4></div>`;
+                // Affiche un avatar par défaut si le logo n'est pas accessible
+                clubDiv.innerHTML = `<img src="${club.logo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(club.name) + '&background=21808d&color=fff'}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;"><div><h4 style="margin: 0;">${club.name}</h4></div>`;
                 clubsList.appendChild(clubDiv);
             });
             document.getElementById('totalClubs').textContent = clubs.length;
