@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Informations Adhérent - Club Kyokushin</title>
     
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap');
@@ -239,20 +238,12 @@
     </div>
     
     <script>
-        // Firebase Configuration - REMPLACEZ PAR VOS VALEURS
-        const firebaseConfig = {
-            apiKey: "VOTRE_API_KEY",
-            authDomain: "VOTRE_AUTH_DOMAIN",
-            databaseURL: "VOTRE_DATABASE_URL",
-            projectId: "VOTRE_PROJECT_ID",
-            storageBucket: "VOTRE_STORAGE_BUCKET",
-            messagingSenderId: "VOTRE_MESSAGING_SENDER_ID",
-            appId: "VOTRE_APP_ID"
-        };
+        // Supabase Configuration - VOS IDENTIFIANTS
+        const SUPABASE_URL = 'https://gmoyoflorwaltuanfswn.supabase.co'
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdtb3lvZmxvcndhbHR1YW5mc3duIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxNTc0OTIsImV4cCI6MjA3NzczMzQ5Mn0.Yr0SFLvcPNbvRqNSjzwFdTZkrIz3Z6WZxcIyx8gwjZA'
         
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
+        // Initialize Supabase
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
         
         // Get member ID from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -300,60 +291,71 @@
         }
         
         // Load Member Information
-        if (memberId) {
-            database.ref('members/' + memberId).once('value', (snapshot) => {
-                if (snapshot.exists()) {
-                    const member = snapshot.val();
-                    
-                    // Get club information
-                    database.ref('clubs/' + member.clubId).once('value', (clubSnapshot) => {
-                        const club = clubSnapshot.val();
-                        
-                        // Calculate end date and status
-                        const endDate = calculateEndDate(member.startDate, member.subscription);
-                        const isActive = isSubscriptionActive(member.startDate, member.subscription);
-                        
-                        // Hide loading, show member info
-                        document.getElementById('loadingState').style.display = 'none';
-                        document.getElementById('memberInfo').style.display = 'block';
-                        
-                        // Display club logo if available
-                        if (club && club.logo) {
-                            const logoImg = document.getElementById('clubLogo');
-                            logoImg.src = club.logo;
-                            logoImg.style.display = 'block';
-                        }
-                        
-                        // Fill in member information
-                        document.getElementById('memberId').textContent = member.id;
-                        document.getElementById('memberName').textContent = `${member.lastName} ${member.firstName}`;
-                        document.getElementById('clubName').textContent = club ? club.name : 'N/A';
-                        document.getElementById('memberDob').textContent = member.dob;
-                        document.getElementById('memberBloodType').textContent = member.bloodType || 'Non spécifié';
-                        document.getElementById('memberSubscription').textContent = formatSubscriptionType(member.subscription);
-                        document.getElementById('startDate').textContent = member.startDate;
-                        document.getElementById('endDate').textContent = endDate;
-                        
-                        // Display status badge
-                        const statusBadge = document.getElementById('statusBadge');
-                        statusBadge.innerHTML = `<span class="status-badge ${isActive ? 'status-active' : 'status-expired'}">${isActive ? '✅ ACTIF' : '⚠️ EXPIRÉ'}</span>`;
-                    });
-                } else {
-                    // Member not found
-                    document.getElementById('loadingState').style.display = 'none';
-                    document.getElementById('errorState').style.display = 'block';
+        async function loadMemberInfo() {
+            if (!memberId) {
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('errorState').innerHTML = '<p>❌ Aucun ID fourni</p><p style="font-size: 0.9em; margin-top: 10px;">Veuillez scanner un QR code valide.</p>';
+                document.getElementById('errorState').style.display = 'block';
+                return;
+            }
+            
+            try {
+                // Get member data
+                const { data: member, error: memberError } = await supabase
+                    .from('members')
+                    .select('*')
+                    .eq('id', memberId)
+                    .single();
+                
+                if (memberError || !member) {
+                    throw new Error('Member not found');
                 }
-            }).catch(error => {
-                console.error('Erreur Firebase:', error);
+                
+                // Get club data
+                const { data: club, error: clubError } = await supabase
+                    .from('clubs')
+                    .select('*')
+                    .eq('id', member.club_id)
+                    .single();
+                
+                // Calculate end date and status
+                const endDate = calculateEndDate(member.start_date, member.subscription);
+                const isActive = isSubscriptionActive(member.start_date, member.subscription);
+                
+                // Hide loading, show member info
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('memberInfo').style.display = 'block';
+                
+                // Display club logo if available
+                if (club && club.logo) {
+                    const logoImg = document.getElementById('clubLogo');
+                    logoImg.src = club.logo;
+                    logoImg.style.display = 'block';
+                }
+                
+                // Fill in member information
+                document.getElementById('memberId').textContent = member.id;
+                document.getElementById('memberName').textContent = `${member.last_name} ${member.first_name}`;
+                document.getElementById('clubName').textContent = club ? club.name : 'N/A';
+                document.getElementById('memberDob').textContent = member.dob;
+                document.getElementById('memberBloodType').textContent = member.blood_type || 'Non spécifié';
+                document.getElementById('memberSubscription').textContent = formatSubscriptionType(member.subscription);
+                document.getElementById('startDate').textContent = member.start_date;
+                document.getElementById('endDate').textContent = endDate;
+                
+                // Display status badge
+                const statusBadge = document.getElementById('statusBadge');
+                statusBadge.innerHTML = `<span class="status-badge ${isActive ? 'status-active' : 'status-expired'}">${isActive ? '✅ ACTIF' : '⚠️ EXPIRÉ'}</span>`;
+                
+            } catch (error) {
+                console.error('Erreur:', error);
                 document.getElementById('loadingState').style.display = 'none';
                 document.getElementById('errorState').style.display = 'block';
-            });
-        } else {
-            // No member ID provided
-            document.getElementById('loadingState').style.display = 'none';
-            document.getElementById('errorState').innerHTML = '<p>❌ Aucun ID fourni</p><p style="font-size: 0.9em; margin-top: 10px;">Veuillez scanner un QR code valide.</p>';
-            document.getElementById('errorState').style.display = 'block';
+            }
         }
+        
+        // Load on page ready
+        loadMemberInfo();
     </script>
 </body>
 </html>
