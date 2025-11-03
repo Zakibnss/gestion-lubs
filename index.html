@@ -639,10 +639,10 @@
                 <label>Arrière-plan de la Carte (742x466 px)</label>
                 <input type="file" id="cardBackground" accept="image/*">
                 // Variable globale pour stocker l'arrière-plan
-let cardBackgroundDataUrl = '';
 
 
-        let cardBackgroundDataUrl = '';
+
+      
         let generatedCards = [];
 
         // Upload Background dans Supabase Storage
@@ -794,6 +794,8 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // Initialize Supabase
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+        let cardBackgroundDataUrl = '';
+        let generatedCards = [];
         // Fonction pour gérer les onglets
 function openTab(tabName) {
     // Cacher tous les contenus d'onglets
@@ -832,8 +834,8 @@ function openTab(tabName) {
 
        
         let html5QrCode = null;
-        let cardBackgroundDataUrl = '';
-        let generatedCards = [];
+       
+     
         
         // Tab Management
         function openTab(tabName) {
@@ -1151,8 +1153,7 @@ function openTab(tabName) {
         
         // Generate Single Card
      // Variable globale pour l'arrière-plan
-let cardBackgroundDataUrl = '';
-let generatedCards = [];
+
 
 // Setup upload background
 function setupCardBackgroundUpload() {
