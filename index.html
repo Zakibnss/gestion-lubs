@@ -713,11 +713,7 @@
 
 
 // Appeler au chargement de la page
-window.onload = function() {
-    setupCardBackgroundUpload();
-    loadDashboard();
-    loadClubs();
-};
+
 
             </div>
             
@@ -838,29 +834,7 @@ function openTab(tabName) {
      
         
         // Tab Management
-        function openTab(tabName) {
-            const tabs = document.querySelectorAll('.tab-content');
-            const tabButtons = document.querySelectorAll('.tab');
-            
-            tabs.forEach(tab => tab.classList.remove('active'));
-            tabButtons.forEach(btn => btn.classList.remove('active'));
-            
-            document.getElementById(tabName).classList.add('active');
-            event.target.classList.add('active');
-            
-            if (tabName === 'cards') {
-                loadMembersForCards();
-            } else if (tabName === 'dashboard') {
-                loadDashboard();
-            } else if (tabName === 'attendance') {
-                loadAttendance();
-            } else if (tabName === 'clubs') {
-                loadClubs();
-            } else if (tabName === 'add-member') {
-                loadClubsForSelect();
-            }
-        }
-        
+       
         // Add Club
         async function addClub() {
     const name = document.getElementById('clubName').value.trim();
